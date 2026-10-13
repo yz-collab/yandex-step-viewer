@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
 <title>Yandex STEP Görüntüleyici</title>
 <style>
   /* atölye ekranı: solda Yandex bağlantısı + klasör gezgini, ortada 3B, sağda parça tablosu; turuncu = seçim */
@@ -251,7 +252,7 @@ async function api(sub, params) {
   const u = new URL(API + sub);
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null) u.searchParams.set(k, v);
   let r;
-  try { r = await fetch(u.href, { credentials: 'omit' }); } catch (e) { throw new YErr('net'); }
+  try { r = await fetch(u.href, { credentials: 'omit', referrerPolicy: 'no-referrer' }); } catch (e) { throw new YErr('net'); }
   if (!r.ok) { let j = {}; try { j = await r.json(); } catch (e) { /* gövde yok */ } throw new YErr('api', r.status, j.description || j.message || ''); }
   return r.json();
 }
@@ -270,7 +271,8 @@ async function listDir(pk, path) {
 async function download(pk, path, sizeHint, onProg) {
   const { href } = await api('/download', { public_key: pk, path: pathParam(path) });
   let r;
-  try { r = await fetch(href, { credentials: 'omit' }); } catch (e) { throw new YErr('net'); }
+  // Yandex indirme sunucusu başka siteden gelen Referer'ı 403 ile reddediyor (CORS başlığı da yok) -> Referer gönderme
+  try { r = await fetch(href, { credentials: 'omit', referrerPolicy: 'no-referrer' }); } catch (e) { throw new YErr('net'); }
   if (!r.ok) throw new YErr('dl', r.status);
   const total = +r.headers.get('content-length') || sizeHint || 0;
   if (!r.body || !r.body.getReader) return new Uint8Array(await r.arrayBuffer());
