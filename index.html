@@ -1,0 +1,1174 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Yandex STEP Görüntüleyici</title>
+<style>
+  /* atölye ekranı: solda Yandex bağlantısı + klasör gezgini, ortada 3B, sağda parça tablosu; turuncu = seçim */
+  :root{--bg:#f4f5f7;--panel:#fff;--glass:rgba(255,255,255,.95);--hover:#eef0f4;--btn:#fff;--line:#d9dde3;--ink:#1d2430;--mute:#6b7380;--acc:#e8641b;--on-acc:#fff;--sel:#fff1e8;--ok:#2e8540;--bad:#c0392b;--warn:#b7791f;--dim:#1f6fb2}
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#15181d;--panel:#1d2127;--glass:rgba(29,33,39,.95);--hover:#282d35;--btn:#252a31;--line:#353b45;--ink:#e4e7ec;--mute:#99a2ae;--acc:#f07a32;--on-acc:#1a1206;--sel:#3a2617;--ok:#5cc178;--bad:#ff6f5e;--warn:#e0a64a;--dim:#5aa6e8;color-scheme:dark}}
+  :root[data-theme="dark"]{--bg:#15181d;--panel:#1d2127;--glass:rgba(29,33,39,.95);--hover:#282d35;--btn:#252a31;--line:#353b45;--ink:#e4e7ec;--mute:#99a2ae;--acc:#f07a32;--on-acc:#1a1206;--sel:#3a2617;--ok:#5cc178;--bad:#ff6f5e;--warn:#e0a64a;--dim:#5aa6e8;color-scheme:dark}
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.35 "Segoe UI",system-ui,sans-serif}
+  button,input{color:var(--ink)}
+  :focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+  #app{display:grid;grid-template-columns:300px minmax(0,1fr);grid-template-rows:minmax(0,1fr);height:100%}
+  body.aside-gizli #app{grid-template-columns:minmax(0,1fr)}
+  aside{position:relative;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+  aside h1{font-size:15px;margin:0;padding:14px 74px 2px 14px}
+  aside .sub{color:var(--mute);font-size:12px;padding:0 14px 10px}
+  #lf{display:flex;gap:6px;margin:0 12px 8px}
+  #link{flex:1;min-width:0;padding:7px 9px;border:1px solid var(--line);border-radius:6px;font:inherit;font-size:13px;background:var(--btn)}
+  #lf button{border:1px solid var(--acc);background:var(--acc);color:var(--on-acc);border-radius:6px;padding:6px 13px;font:inherit;font-weight:600;cursor:pointer}
+  #crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:1px 2px;margin:0 12px 6px;font-size:12px;color:var(--mute);min-height:18px}
+  #crumbs button{border:0;background:none;padding:1px 4px;border-radius:4px;color:var(--acc);font:inherit;cursor:pointer;max-width:100%;overflow-wrap:anywhere;text-align:left}
+  #crumbs button:hover{background:var(--hover)}
+  #crumbs button.cur{color:var(--ink);font-weight:600;cursor:default}
+  #crumbs button.cur:hover{background:none}
+  .row2{display:flex;gap:6px;margin:0 12px 8px}
+  #q{flex:1;min-width:0;padding:6px 9px;border:1px solid var(--line);border-radius:6px;font:inherit;font-size:13px;background:var(--btn)}
+  .row2 button,#foot button{border:1px solid var(--line);background:var(--btn);border-radius:6px;padding:5px 9px;font:inherit;font-size:12.5px;cursor:pointer;white-space:nowrap}
+  .row2 button:hover,#foot button:hover{border-color:var(--acc)}
+  #list{overflow:auto;flex:1;padding:0 6px 10px;min-height:0}
+  #list h4{margin:10px 9px 4px;font-size:11px;font-weight:600;color:var(--mute);text-transform:uppercase;letter-spacing:.04em;overflow-wrap:anywhere}
+  #list .it{display:flex;gap:8px;width:100%;text-align:left;border:0;background:none;padding:6px 9px;border-radius:6px;font:inherit;color:inherit;cursor:pointer;align-items:center}
+  #list .it svg{flex:none;width:16px;height:16px;color:var(--mute)}
+  #list .it.dir svg{color:var(--warn)}
+  #list .it span{flex:1;min-width:0;overflow-wrap:anywhere}
+  #list .it b{font-weight:500;color:var(--mute);font-variant-numeric:tabular-nums;font-size:12px;white-space:nowrap}
+  #list .it:hover{background:var(--hover)}
+  #list .it.on{background:var(--sel);color:var(--acc);font-weight:600}
+  #list .it.on svg{color:var(--acc)}
+  #list .lmsg{margin:10px 9px;color:var(--mute);font-size:13px;line-height:1.5}
+  #list .lmsg.err{color:var(--bad)}
+  #list .other{margin:8px 9px;color:var(--mute);font-size:12px}
+  #list .lhd{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:6px 9px 2px;font-size:12px;color:var(--mute)}
+  #list .lhd button{border:1px solid var(--line);background:var(--btn);border-radius:6px;padding:3px 8px;font:inherit;font-size:12px;cursor:pointer;color:var(--ink)}
+  .start{margin:4px 9px;font-size:13px;line-height:1.5}
+  .start ol{margin:4px 0 10px;padding-left:20px}
+  .start li{margin-bottom:4px}
+  .start p{margin:6px 0}
+  .start .rc{display:block;width:100%;text-align:left;border:1px solid var(--line);background:var(--btn);border-radius:6px;padding:6px 9px;margin:0 0 6px;font:inherit;font-size:12.5px;cursor:pointer;color:var(--ink);overflow-wrap:anywhere}
+  .start .rc:hover{border-color:var(--acc)}
+  .start .rc small{display:block;color:var(--mute);font-size:11px}
+  #foot{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 12px;border-top:1px solid var(--line)}
+  #foot .note{font-size:11px;color:var(--mute);line-height:1.4;width:100%}
+  #openall{border-color:var(--acc)!important;color:var(--acc);font-weight:600}
+  main{position:relative;min-width:0;display:flex;flex-direction:column}
+  #bar{display:flex;flex-wrap:wrap;gap:6px;column-gap:14px;align-items:center;padding:8px 10px;background:var(--panel);border-bottom:1px solid var(--line)}
+  #bar button,#bar a.bb{border:1px solid var(--line);background:var(--btn);border-radius:6px;padding:5px 10px;font:inherit;cursor:pointer;color:var(--ink);text-decoration:none;display:inline-block}
+  #bar button:hover,#bar a.bb:hover{border-color:var(--acc)}
+  #bar button.on{background:var(--acc);border-color:var(--acc);color:var(--on-acc)}
+  #bar .grp{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+  #bar .grp small{color:var(--mute);font-size:11.5px;margin-right:2px}
+  #title{font-weight:600;overflow-wrap:anywhere}
+  #dims{color:var(--mute);margin-left:auto}
+  #view{flex:1;position:relative;min-height:0;background:var(--bg)}
+  canvas{display:block;position:absolute;inset:0;width:100%;height:100%}
+  #msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;padding:20px;z-index:5}
+  #msg .box{max-width:460px;text-align:center;color:var(--mute);line-height:1.5}
+  #msg .box.card{background:var(--glass);border:1px solid var(--line);border-radius:10px;padding:14px 18px;color:var(--ink);pointer-events:auto}
+  #msg .box.err{color:var(--bad)}
+  #msg .box small{display:block;color:var(--mute);font-size:12px;margin-top:4px}
+  #msg .pbar{height:6px;border-radius:3px;background:var(--line);margin:10px 0 2px;overflow:hidden}
+  #msg .pbar i{display:block;height:100%;background:var(--acc);width:0;transition:width .15s}
+  #msg .box button{margin-top:10px;border:1px solid var(--acc);background:var(--acc);color:var(--on-acc);border-radius:6px;padding:6px 14px;font:inherit;font-weight:600;cursor:pointer}
+  #msg .box button.alt{background:var(--btn);color:var(--ink);border-color:var(--line);margin-left:6px}
+  #view.drop::after{content:"STEP dosyalarını bırakın";position:absolute;inset:10px;border:2px dashed var(--acc);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;color:var(--acc);background:var(--glass);z-index:6}
+  .pnl{position:absolute;background:var(--glass);border:1px solid var(--line);border-radius:8px;z-index:2}
+  #info{left:10px;bottom:10px;padding:8px 10px;max-width:min(470px,calc(100% - 20px));max-height:55%;overflow:auto}
+  #info .ib{padding-right:66px}
+  #info small{color:var(--mute)}
+  #info table{border-collapse:collapse;margin-top:4px;font-size:12px}
+  #info td,#info th{padding:1px 8px 1px 0;text-align:left;font-weight:500;color:var(--mute);vertical-align:top}
+  #info td{color:var(--ink);font-variant-numeric:tabular-nums}
+  #info .ibtn{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+  #info .ibtn button,#info .ibtn a{border:1px solid var(--line);background:var(--btn);border-radius:6px;padding:3px 9px;font:inherit;font-size:12.5px;cursor:pointer;color:var(--ink);text-decoration:none}
+  #info .ibtn button:hover,#info .ibtn a:hover{border-color:var(--acc)}
+  #info .ibtn button.on{background:var(--acc);border-color:var(--acc);color:var(--on-acc)}
+  #parts{right:10px;top:10px;max-height:calc(100% - 20px);overflow:auto;width:360px;font-size:12.5px}
+  #parts h3{margin:0;padding:8px 74px 8px 10px;font-size:13px;border-bottom:1px solid var(--line)}
+  #parts div.r{display:flex;gap:6px;align-items:center;padding:4px 10px;cursor:pointer}
+  #parts div.r:hover{background:var(--hover)}
+  #parts div.r.on{background:var(--sel);color:var(--acc)}
+  #parts i{width:11px;height:11px;border-radius:2px;flex:none;border:1px solid rgba(127,127,127,.4)}
+  #parts div.r span{flex:1;min-width:0;overflow-wrap:anywhere}
+  #parts div.r b{width:58px;text-align:right;font-weight:600;color:var(--mute);flex:none;font-variant-numeric:tabular-nums}
+  #parts div.hd{cursor:default;color:var(--mute);font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--line)}
+  #parts div.hd b{font-weight:600;font-size:10.5px}
+  #parts div.hd:hover{background:none}
+  #parts div.fh{display:flex;gap:6px;align-items:center;padding:7px 10px 3px;font-weight:600;cursor:pointer;border-top:1px solid var(--line)}
+  #parts div.fh:hover{background:var(--hover)}
+  #parts div.fh.on{background:var(--sel);color:var(--acc)}
+  #parts div.fh span{flex:1;min-width:0;overflow-wrap:anywhere}
+  #parts div.fh small{color:var(--mute);font-weight:500}
+  #parts .note{padding:6px 10px 9px;color:var(--mute);font-size:11.5px;border-top:1px solid var(--line)}
+  #parts .warnbox{margin:8px 10px;padding:7px 9px;border:1px solid var(--warn);border-radius:6px;font-size:12px;line-height:1.45}
+  #parts .warnbox b{color:var(--warn)}
+  #tools{position:absolute;left:10px;top:10px;display:flex;flex-direction:column;align-items:flex-start;gap:6px;z-index:3;max-width:min(470px,calc(100% - 390px))}
+  #tools .sub{display:none;background:var(--glass);border:1px solid var(--line);border-radius:8px;padding:7px 9px;gap:7px;align-items:center;flex-wrap:wrap;width:100%}
+  #tools .sub.show{display:flex}
+  #tools label{font-size:11px;color:var(--mute);font-weight:600;letter-spacing:.05em}
+  #tools .val{font-family:Consolas,"Cascadia Mono",monospace;font-size:12px;font-variant-numeric:tabular-nums;min-width:70px}
+  #tools input[type=range]{flex:1;min-width:110px;accent-color:var(--acc);margin:0}
+  #tools button{border:1px solid var(--line);background:var(--btn);border-radius:6px;padding:3px 8px;font:inherit;font-size:12.5px;cursor:pointer}
+  #tools button:hover{border-color:var(--acc)}
+  #tools button.on{background:var(--acc);border-color:var(--acc);color:var(--on-acc)}
+  #labels{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:1}
+  .mlabel{position:absolute;transform:translate(-50%,-115%);background:var(--panel);color:var(--ink);border:1.5px solid var(--acc);border-radius:6px;padding:2px 7px;font:12px/1.3 Consolas,"Cascadia Mono",monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .mlabel small{display:block;color:var(--mute);font-size:10px}
+  .mlabel.dim{border-color:var(--dim);color:var(--dim);transform:translate(-50%,-50%);padding:1px 6px;font-weight:600}
+  .mlabel.fname{border-color:var(--line);color:var(--ink);font:600 11.5px/1.3 "Segoe UI",system-ui,sans-serif;transform:translate(-50%,-120%);padding:1px 6px}
+  .mlabel.fname.left{transform:translate(calc(-100% - 8px),-50%)}
+  canvas.meas{cursor:crosshair}
+  /* 08.10 KURAL: her panelde Gizle ✕ + ☰ geri getirme sekmesi, H tuşu hepsi */
+  .pgz-b{position:absolute;top:7px;right:8px;z-index:3;font:500 11px "Segoe UI",system-ui,sans-serif;padding:3px 8px;border-radius:6px;border:1px solid var(--line);background:var(--btn);color:var(--ink);cursor:pointer;line-height:1.3}
+  .pgz-b:hover{border-color:var(--acc)}
+  #tools .sub .pgz-b{position:static;margin-left:auto}
+  .pgizli{display:none!important}
+  .pgz-g{font:600 12px "Segoe UI",system-ui,sans-serif;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:var(--glass);color:var(--ink);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15);z-index:3}
+  .pgz-g:hover{border-color:var(--acc)}
+  #view>.pgz-g{position:absolute}
+  .pgz-g.tr{right:10px;top:10px} .pgz-g.bl{left:10px;bottom:10px}
+  @media (max-width:820px){
+    #app{grid-template-columns:minmax(0,1fr);grid-template-rows:290px minmax(0,1fr)}
+    body.aside-gizli #app{grid-template-rows:minmax(0,1fr)}
+    aside{border-right:0;border-bottom:1px solid var(--line)}
+    #foot .note,aside .sub{display:none}
+    #bar{flex-wrap:nowrap;overflow-x:auto;padding:6px 8px}
+    #bar .grp{flex-wrap:nowrap}
+    #bar button,#bar a.bb,#title,#dims{white-space:nowrap}
+    #parts{width:min(320px,calc(100% - 20px));max-height:55%}
+    #tools{max-width:calc(100% - 20px)}
+    #dims{margin-left:0}
+  }
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+</head>
+<body>
+<div id="app">
+  <aside>
+    <h1>Yandex STEP Görüntüleyici</h1>
+    <div class="sub">Yandex Disk paylaşım bağlantısını yapıştırın; altındaki STEP dosyaları listelenir.</div>
+    <form id="lf" autocomplete="off"><input id="link" type="url" inputmode="url" placeholder="https://disk.yandex.com/d/…" aria-label="Yandex Disk bağlantısı"><button type="submit">Aç</button></form>
+    <div id="crumbs"></div>
+    <div class="row2"><input id="q" placeholder="Dosya ara" aria-label="Dosya ara"><button id="scanbtn" type="button" title="Bu klasörün altındaki bütün klasörlerde STEP dosyalarını bul" hidden>Alt klasörler dahil</button></div>
+    <div id="list"></div>
+    <div id="foot">
+      <button id="openall" type="button" hidden>Hepsini birlikte aç</button>
+      <div class="note">Dosyalar Yandex'ten doğrudan bu tarayıcıya iner ve burada açılır; hiçbir sunucuya yüklenmez. Bilgisayardaki STEP dosyalarını pencereye sürükleyip bırakabilirsiniz.</div>
+    </div>
+  </aside>
+  <main>
+    <div id="bar">
+      <span id="title">—</span>
+      <span class="grp"><button data-v="iso" class="on" title="İzometrik (0)">İzo</button><button data-v="top" title="Üstten (1)">Üst</button><button data-v="bottom" title="Alttan (2)">Alt</button><button data-v="front" title="Önden (3)">Ön</button><button data-v="back" title="Arkadan (8)">Arka</button><button data-v="left" title="Soldan (4)">Sol</button><button data-v="right" title="Sağdan (5)">Sağ</button></span>
+      <span class="grp"><button id="fit" title="Sığdır (F) · boşluğa çift tık da sığdırır">Sığdır</button><button id="zin" title="Yakınlaştır (+)" aria-label="Yakınlaştır">＋</button><button id="zout" title="Uzaklaştır (−)" aria-label="Uzaklaştır">−</button><button id="projbtn" title="Ortografik (ölçekli, perspektifsiz) görünüş — Üst/Alt/Ön/Arka/Sol/Sağ'da kendiliğinden açılır (O)">Orto</button></span>
+      <span class="grp"><button id="secbtn" title="Kesit düzlemi (K)">Kesit</button><button id="expbtn" title="Açılım: parçaları ayır (A)">Açılım</button><button id="measbtn" title="İki nokta arası ölçü (M)">Ölçü</button><button id="dimbtn" class="on" title="Gabari ölçü çizgileri (G)">Gabari</button></span>
+      <span class="grp"><button id="xray" title="Şeffaf (X)">Şeffaf</button><button id="edges" class="on" title="Kenar çizgileri (E)">Kenarlar</button><button id="zup" class="on" title="Model Z ekseni yukarı (Rhino, AutoCAD, çoğu CAD). Kapatınca Y yukarı olur.">Z yukarı</button></span>
+      <span class="grp" id="laygrp" hidden><small>Yerleşim</small><button id="lay-yan" class="on" title="Dosyaları masaya dizer gibi yan yana koy">Yan yana</button><button id="lay-konum" title="Dosyaları modeldeki gerçek konumlarında göster">Konumunda</button><button id="namebtn" class="on" title="Dosya adlarını göster (N)">Adlar</button></span>
+      <span class="grp"><a id="ylink" class="bb" href="#" target="_blank" rel="noopener" hidden>Yandex'te aç</a><button id="copybtn" type="button" hidden title="Bu görünümün bağlantısını kopyala">Bağlantıyı kopyala</button></span>
+      <span id="dims"></span>
+    </div>
+    <div id="view">
+      <div id="msg"><div class="box">Soldan bir STEP dosyası seçin</div></div>
+      <div id="labels"></div>
+      <div id="tools">
+        <div class="sub" id="secpanel">
+          <label>KESİT</label>
+          <button data-ax="0" class="on">X</button><button data-ax="1">Y</button><button data-ax="2">Z</button>
+          <button id="secflip" title="Kesilen tarafı değiştir">Ters</button><button id="seclook" title="Kesit düzlemine dik bak">Dik bak</button>
+          <input type="range" id="secpos" min="0" max="1000" value="500" aria-label="Kesit konumu"><span class="val" id="secval"></span>
+        </div>
+        <div class="sub" id="exppanel">
+          <label>AÇILIM</label>
+          <input type="range" id="exppos" min="0" max="100" value="0" aria-label="Açılım miktarı"><span class="val" id="expval">%0</span>
+          <button id="expreset">Kapat</button>
+        </div>
+        <div class="sub" id="measpanel">
+          <label>ÖLÇÜ</label><span class="val" id="measout"></span>
+          <button id="measundo">Geri al</button><button id="measclear">Temizle</button>
+        </div>
+      </div>
+      <div id="parts" class="pnl" hidden><div id="partsbody"></div></div>
+      <div id="info" class="pnl" style="display:none"><div class="ib" id="infobody"></div></div>
+    </div>
+  </main>
+</div>
+
+<script>
+  window.onerror = (m) => {
+    if (String(m).includes('ResizeObserver')) return true;
+    const e = document.querySelector('#msg'); if (!e) return;
+    e.style.display = 'flex'; e.innerHTML = '<div class="box err"></div>';
+    e.firstChild.textContent = 'Hata: ' + m + ' (WebGL / donanım hızlandırma kapalı olabilir ya da internet bağlantısı yok)';
+  };
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ================= ayarlar =================
+const OCCT = 'https://cdn.jsdelivr.net/npm/occt-import-js@0.0.23/dist';       // OpenCascade (WASM) STEP okuyucu
+const API = 'https://cloud-api.yandex.net/v1/disk/public/resources';           // Yandex herkese açık klasör API'si (anonim, CORS açık)
+const EXAMPLE = '';
+const MESH = { linearUnit: 'millimeter', linearDeflectionType: 'bounding_box_ratio', linearDeflection: 0.0005, angularDeflection: 0.3 };
+const CAD_RE = /\.(step|stp|p21|iges|igs|brep|brp)$/i;
+const BIG = 150 * 1048576, MAX_FILES = 60, MAX_DIRS = 400;
+const extOf = n => /\.(iges|igs)$/i.test(n) ? 'iges' : /\.(brep|brp)$/i.test(n) ? 'brep' : 'step';
+
+const $ = s => document.querySelector(s);
+const fmt = (v, d = 1) => (+v).toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: d });
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+const fmtSize = b => !b ? '' : b >= 1048576 ? fmt(b / 1048576, 1) + ' MB' : fmt(Math.max(1, b / 1024), 0) + ' KB';
+const lsGetJ = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } };
+const lsSetJ = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* depolama kapalı */ } };
+const ICON_DIR = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M1.5 3.5A1.5 1.5 0 0 1 3 2h3.2l1.6 1.6H13A1.5 1.5 0 0 1 14.5 5v7.5A1.5 1.5 0 0 1 13 14H3a1.5 1.5 0 0 1-1.5-1.5z"/></svg>';
+const ICON_CAD = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" d="M8 1.8 13.6 5v6L8 14.2 2.4 11V5zM2.4 5 8 8.2 13.6 5M8 8.2v6"/></svg>';
+
+// ================= Yandex =================
+class YErr extends Error { constructor(kind, status, msg) { super(msg || kind); this.kind = kind; this.status = status; } }
+function parseLink(raw) {
+  let s = String(raw || '').trim(); if (!s) return null;
+  if (!/^https?:\/\//i.test(s)) s = 'https://' + s;
+  let u; try { u = new URL(s); } catch (e) { return null; }
+  const host = u.hostname.toLowerCase();
+  if (!/(^|\.)yandex\.[a-z.]+$/.test(host) && !/(^|\.)yadi\.sk$/.test(host)) return null;
+  if (/^\/client\//.test(u.pathname)) return { private: true };
+  const m = u.pathname.match(/^\/(d|i)\/([^/]+)(\/.*)?$/);
+  if (m) {
+    const pk = `https://${u.host}/${m[1]}/${m[2]}`;
+    const sub = (m[3] || '').replace(/\/+$/, '').split('/').map(x => { try { return decodeURIComponent(x); } catch (e) { return x; } }).join('/');
+    return { pk, path: sub || '/' };
+  }
+  return { pk: s, path: '/' };     // eski biçimli bağlantılar (…/public?hash=…) olduğu gibi denenir
+}
+const pathParam = p => (p && p !== '/' ? p : undefined);
+async function api(sub, params) {
+  const u = new URL(API + sub);
+  for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null) u.searchParams.set(k, v);
+  let r;
+  try { r = await fetch(u.href, { credentials: 'omit' }); } catch (e) { throw new YErr('net'); }
+  if (!r.ok) { let j = {}; try { j = await r.json(); } catch (e) { /* gövde yok */ } throw new YErr('api', r.status, j.description || j.message || ''); }
+  return r.json();
+}
+async function listDir(pk, path) {
+  const items = []; let offset = 0, meta = null;
+  for (let g = 0; g < 40; g++) {
+    const d = await api('', { public_key: pk, path: pathParam(path), limit: 500, offset, preview_size: 'S' });
+    if (!meta) meta = d;
+    if (d.type !== 'dir') return { meta: d, items: null };
+    const e = d._embedded || { items: [], total: 0 };
+    items.push(...e.items); offset += e.items.length;
+    if (!e.items.length || offset >= e.total) break;
+  }
+  return { meta, items };
+}
+async function download(pk, path, sizeHint, onProg) {
+  const { href } = await api('/download', { public_key: pk, path: pathParam(path) });
+  let r;
+  try { r = await fetch(href, { credentials: 'omit' }); } catch (e) { throw new YErr('net'); }
+  if (!r.ok) throw new YErr('dl', r.status);
+  const total = +r.headers.get('content-length') || sizeHint || 0;
+  if (!r.body || !r.body.getReader) return new Uint8Array(await r.arrayBuffer());
+  const rd = r.body.getReader(), chunks = []; let got = 0;
+  for (;;) { const { done, value } = await rd.read(); if (done) break; chunks.push(value); got += value.length; onProg && onProg(got, total); }
+  const out = new Uint8Array(got); let o = 0; for (const c of chunks) { out.set(c, o); o += c.length; }
+  return out;
+}
+function errText(e) {
+  if (e && e.kind === 'net') return 'Yandex\'e ulaşılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.';
+  if (e && e.kind === 'api') {
+    if (e.status === 404) return 'Bağlantı bulunamadı. Paylaşım kaldırılmış, klasörün adı değişmiş ya da bağlantı eksik kopyalanmış olabilir.';
+    if (e.status === 401 || e.status === 403) return 'Bu paylaşıma erişim yok (şifreli ya da kapatılmış paylaşım).';
+    if (e.status === 429) return 'Yandex kısa sürede çok istek aldı. Bir dakika bekleyip tekrar deneyin.';
+    return `Yandex hata verdi (${e.status}). ${e.message || ''}`;
+  }
+  if (e && e.kind === 'dl') return e.status >= 500 ? `Yandex bu dosyayı veremedi (sunucu hatası ${e.status}). Dosya Yandex'te bozuk olabilir; biraz sonra tekrar deneyin.` : `Dosya indirilemedi (hata ${e.status}).`;
+  if (e && e.kind === 'engine') return 'Okuma motoru (OpenCascade) yüklenemedi. cdn.jsdelivr.net adresine erişim engelli olabilir.';
+  if (e && e.kind === 'read') return 'Dosya okunamadı. STEP bozuk ya da desteklenmeyen biçimde olabilir.' + (e.message && e.message !== 'read' ? ` (${e.message})` : '');
+  return 'Hata: ' + (e && e.message || e);
+}
+
+// ================= STEP okuma (OpenCascade WASM, ayrı iş parçacığında) =================
+// Worker'a metin olarak da gönderildiği için kendi içinde bağımsız olmalı
+function occtJobCore(occt, buf, ext, params) {
+  const fn = ext === 'iges' ? 'ReadIgesFile' : ext === 'brep' ? 'ReadBrepFile' : 'ReadStepFile';
+  const r = occt[fn](buf, params);
+  if (!r || !r.success || !r.meshes) throw new Error('read');
+  const owner = new Array(r.meshes.length).fill('');
+  const walk = (n, nm) => { const name = n.name && n.name !== 'Document' ? n.name : nm; (n.meshes || []).forEach(i => { owner[i] = name; }); (n.children || []).forEach(c => walk(c, name)); };
+  if (r.root) walk(r.root, '');
+  const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+  for (const m of r.meshes) { const p = m.attributes.position.array; for (let k = 0; k < p.length; k += 3) for (let a = 0; a < 3; a++) { const v = p[k + a]; if (v < mn[a]) mn[a] = v; if (v > mx[a]) mx[a] = v; } }
+  if (!isFinite(mn[0])) throw new Error('Dosyada katı model yok');
+  const c = [0, 1, 2].map(a => (mn[a] + mx[a]) / 2), out = [], tr = [];
+  r.meshes.forEach((m, i) => {
+    const p = m.attributes.position.array, P = new Float32Array(p.length);
+    for (let k = 0; k < p.length; k += 3) { P[k] = p[k] - c[0]; P[k + 1] = p[k + 1] - c[1]; P[k + 2] = p[k + 2] - c[2]; }
+    const N = m.attributes.normal && m.attributes.normal.array.length === p.length ? new Float32Array(m.attributes.normal.array) : null;
+    const I = new Uint32Array(m.index.array);
+    let col = m.color || null;
+    if (!col && m.brep_faces && m.brep_faces.length && m.brep_faces[0].color) {
+      const f0 = m.brep_faces[0].color;
+      if (m.brep_faces.every(f => f.color && f.color[0] === f0[0] && f.color[1] === f0[1] && f.color[2] === f0[2])) col = f0;
+    }
+    out.push({ name: m.name || '', owner: owner[i], color: col, P, N, I });
+    tr.push(P.buffer, I.buffer); if (N) tr.push(N.buffer);
+  });
+  return { res: { meshes: out, center: c, size: [0, 1, 2].map(a => mx[a] - mn[a]) }, tr };
+}
+let worker = null, noWorker = false, wseq = 0, mainOcct = null, engineReady = false;
+const wjobs = new Map();
+function makeWorker() {
+  const src = `importScripts(${JSON.stringify(OCCT + '/occt-import-js.js')});\nlet P=null;\n${occtJobCore.toString()}\n` +
+    `onmessage=async e=>{const d=e.data;try{P=P||occtimportjs({locateFile:f=>${JSON.stringify(OCCT + '/')}+f});const o=await P;` +
+    `const x=occtJobCore(o,new Uint8Array(d.buf),d.ext,d.params);postMessage({id:d.id,ok:true,res:x.res},x.tr);}` +
+    `catch(err){P=null;postMessage({id:d.id,ok:false,err:String(err&&err.message||err)});}};`;
+  const w = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+  w.onmessage = e => {
+    const j = wjobs.get(e.data.id); if (!j) return; wjobs.delete(e.data.id);
+    if (e.data.ok) { engineReady = true; j.res(e.data.res); }
+    else { const m = e.data.err || ''; j.rej(new YErr(/fetch|wasm|network|import/i.test(m) && !engineReady ? 'engine' : 'read', 0, m)); dropWorker(); }
+  };
+  w.onerror = e => { e.preventDefault && e.preventDefault(); const err = new YErr('engine', 0, e.message || ''); for (const j of wjobs.values()) j.rej(err); wjobs.clear(); dropWorker(); };
+  return w;
+}
+function dropWorker() { try { worker && worker.terminate(); } catch (e) { /* zaten kapalı */ } worker = null; }
+function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new YErr('engine')); document.head.appendChild(s); }); }
+async function parseOne(buf, ext) {
+  if (!noWorker && !worker) { try { worker = makeWorker(); } catch (e) { noWorker = true; } }
+  if (!noWorker) return new Promise((res, rej) => { const id = ++wseq; wjobs.set(id, { res, rej }); worker.postMessage({ id, buf: buf.buffer, ext, params: MESH }, [buf.buffer]); });
+  if (!mainOcct) mainOcct = loadScript(OCCT + '/occt-import-js.js').then(() => window.occtimportjs({ locateFile: f => OCCT + '/' + f }));
+  let occt; try { occt = await mainOcct; } catch (e) { mainOcct = null; throw new YErr('engine'); }
+  try { const r = occtJobCore(occt, buf, ext, MESH).res; engineReady = true; return r; } catch (e) { mainOcct = null; throw new YErr('read', 0, e.message); }
+}
+let parseChain = Promise.resolve();
+function parseCAD(buf, ext) { const p = parseChain.then(() => parseOne(buf, ext)); parseChain = p.catch(() => {}); return p; }
+const cache = new Map();
+function cacheSet(k, v) { cache.set(k, v); while (cache.size > 40) cache.delete(cache.keys().next().value); }
+
+// ================= sahne =================
+const view = $('#view');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, logarithmicDepthBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setClearColor(0x000000, 0);
+view.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+// iki kamera: izometrik perspektif; üst/alt/ön/arka/sol/sağ görünüşleri ORTOGRAFİK (ölçüde perspektif yanılması olmasın)
+const persp = new THREE.PerspectiveCamera(35, 1, 1, 1e7);
+const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1e7);
+let camera = persp, orthoH = 100;
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+const isOrtho = () => camera === ortho;
+function useCam(c) {
+  if (camera === c) return;
+  c.position.copy(camera.position); c.up.copy(camera.up); camera = c;
+  controls.object = c; occR = -1; applyOffset(true); controls.update();
+  $('#projbtn').classList.toggle('on', c === ortho);
+}
+function orthoFrustum() {
+  const w = view.clientWidth || 1, h = view.clientHeight || 1, a = w / h;
+  ortho.left = -orthoH * a; ortho.right = orthoH * a; ortho.top = orthoH; ortho.bottom = -orthoH; ortho.updateProjectionMatrix();
+}
+function mmPerPx() {
+  const h = view.clientHeight || 1;
+  if (isOrtho()) return (ortho.top - ortho.bottom) / ortho.zoom / h;
+  return 2 * camera.position.distanceTo(controls.target) * Math.tan(THREE.MathUtils.degToRad(persp.fov / 2)) / h;
+}
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8f99, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(1, 2, 1.5); scene.add(sun);
+const sun2 = new THREE.DirectionalLight(0xffffff, 0.6); sun2.position.set(-1.5, -0.5, -1); scene.add(sun2);
+
+// STEP'te rengi olmayan gövdeler için yumuşak ayırt edici renkler (ilki alüminyum grisi)
+const PAL = [0xa9b1ba, 0xc8a46e, 0x8fb0cf, 0xa3c48f, 0xcf9a92, 0xb3a5d0, 0x92c8c0, 0xd6bf8c, 0x9fa8c9, 0xc4b4a0];
+const edgeMat = new THREE.LineBasicMaterial({ color: 0x1d2430, transparent: true, opacity: 0.45 });
+
+let files = [], parts = [], root = null, selKey = null, isoKey = null, radius = 1;
+let showEdges = true, xray = false, showDims = true, showNames = true, zUp = lsGetJ('ysv_zup', true), layout = 'yan', loadWarn = [];
+const box = new THREE.Box3();
+const partsEl = $('#parts'), partsBody = $('#partsbody'), info = $('#info'), infoBody = $('#infobody'), labelsEl = $('#labels');
+$('#zup').classList.toggle('on', zUp);
+
+function clearScene() {
+  if (!root) return;
+  scene.remove(root);
+  root.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material !== edgeMat) o.material.dispose(); });
+  root = null; parts = []; fileLabels.forEach(l => l.el.remove()); fileLabels.length = 0;
+}
+const fileLabels = [];
+function buildScene(keepView) {
+  clearScene();
+  root = new THREE.Group(); root.rotation.x = zUp ? -Math.PI / 2 : 0;
+  let pid = 0;
+  files.forEach((f, fi) => {
+    const g = new THREE.Group(); f.group = g; root.add(g);
+    const n = f.res.meshes.length;
+    f.res.meshes.forEach((m, mi) => {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(m.P, 3));
+      if (m.N) geo.setAttribute('normal', new THREE.BufferAttribute(m.N, 3));
+      geo.setIndex(new THREE.BufferAttribute(m.I, 1));
+      if (!m.N) geo.computeVertexNormals();
+      geo.computeBoundingBox(); geo.computeBoundingSphere();
+      const col = m.color ? new THREE.Color().setRGB(m.color[0], m.color[1], m.color[2]).getHex() : PAL[pid % PAL.length];
+      const mat = new THREE.MeshStandardMaterial({ color: col, metalness: 0.25, roughness: 0.6, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+      const mesh = new THREE.Mesh(geo, mat);
+      const nm = m.name || (m.owner ? (n > 1 ? `${m.owner} · gövde ${mi + 1}` : m.owner) : `Gövde ${mi + 1}`);
+      const p = { id: pid, obj: mesh, name: nm, key: m.name ? fi + '|' + m.name : 'u' + pid, fi, file: f.name, mat, base: col, geo, named: !!m.name, owner: m.owner };
+      pid++;
+      mesh.userData.part = p;
+      const e = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), edgeMat);
+      e.userData.edge = true; e.visible = showEdges; e.raycast = () => {}; mesh.add(e);
+      g.add(mesh); parts.push(p);
+    });
+    if (files.length > 1) { const el = document.createElement('div'); el.className = 'mlabel fname'; el.textContent = f.name.replace(CAD_RE, ''); labelsEl.append(el); fileLabels.push({ el, fi }); }
+  });
+  scene.add(root);
+  arrange(); afterLayout();
+  clearMeasures(); expPos.value = 0; setExplode(0);
+  selKey = null; isoKey = null; info.style.display = 'none';
+  $('#laygrp').hidden = files.length < 2;
+  computeStatsAll(); regroup(); buildParts(); applyVis(); applySection();
+  if (!keepView) setViewOn(files.length > 1 && layout === 'yan' ? 'top' : 'iso');
+  fit(curView === 'iso' || !DIRS[curView] ? 'iso' : curView);
+  const s = box.getSize(new THREE.Vector3());
+  const [X, Y, Z] = zUp ? [s.x, s.z, s.y] : [s.x, s.y, s.z];
+  $('#dims').textContent = `Gabari ≈ ${fmt(X, 0)} × ${fmt(Y, 0)} × ${fmt(Z, 0)} mm (X × Y × Z)`;
+  $('#msg').style.display = 'none';
+}
+// birden çok dosya: "yan yana" (masaya dizer gibi) ya da "konumunda" (modeldeki gerçek yerleri)
+function arrange() {
+  if (files.length === 1) { files[0].group.position.set(0, 0, 0); return; }
+  if (layout === 'konum') {
+    const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+    for (const f of files) for (let a = 0; a < 3; a++) { mn[a] = Math.min(mn[a], f.res.center[a] - f.res.size[a] / 2); mx[a] = Math.max(mx[a], f.res.center[a] + f.res.size[a] / 2); }
+    const ref = mn.map((v, a) => (v + mx[a]) / 2);
+    for (const f of files) f.group.position.set(f.res.center[0] - ref[0], f.res.center[1] - ref[1], f.res.center[2] - ref[2]);
+    return;
+  }
+  // model ekseninde: X boyunca diz, satır dolunca -Y yönünde yeni satır; hepsi Z=0 düzlemine otursun
+  const it = files.map(f => ({ f, w: f.res.size[0], d: f.res.size[1], h: f.res.size[2] }));
+  const mins = it.map(o => Math.min(o.w, o.d)).sort((a, b) => a - b), med = mins[Math.floor(mins.length / 2)] || 50;
+  const maxDim = Math.max(...it.map(o => Math.max(o.w, o.d)));
+  const gap = Math.min(Math.max(30, med * 0.6), Math.max(30, maxDim * 0.08));   // aralık kesite göre (profil boyuna göre değil)
+  const W = Math.max(Math.max(...it.map(o => o.w)), Math.sqrt(it.reduce((s, o) => s + (o.w + gap) * (o.d + gap), 0)) * 1.5);
+  let x = 0, y = 0, rowD = 0;
+  for (const o of it) {
+    if (x > 0 && x + o.w > W) { x = 0; y += rowD + gap * 1.6; rowD = 0; }
+    o.f.group.position.set(x + o.w / 2, -(y + o.d / 2), o.h / 2);
+    x += o.w + gap; rowD = Math.max(rowD, o.d);
+  }
+}
+function afterLayout() {
+  for (const p of parts) p.obj.position.set(0, 0, 0);
+  root.updateMatrixWorld(true);
+  box.setFromObject(root);
+  const c = box.getCenter(new THREE.Vector3());
+  for (const p of parts) { p.homeW = p.obj.getWorldPosition(new THREE.Vector3()); p.dirW = new THREE.Box3().setFromObject(p.obj).getCenter(new THREE.Vector3()).sub(c); }
+  labelTops();
+}
+function labelTops() {   // yan yana: ad parçanın sol ucunda (liste gibi), konumunda: üst ortada
+  const left = layout === 'yan';
+  for (const l of fileLabels) {
+    const b = new THREE.Box3().setFromObject(files[l.fi].group);
+    l.p = new THREE.Vector3(left ? b.min.x : (b.min.x + b.max.x) / 2, b.max.y, (b.min.z + b.max.z) / 2);
+    l.el.classList.toggle('left', left);
+  }
+}
+
+// ---------- parça ölçüleri: kendi kutusu (OBB), hacim, alan ----------
+function eig3(m) {   // simetrik 3x3 (Jacobi) -> özvektörler
+  const A = [[m[0], m[1], m[2]], [m[1], m[3], m[4]], [m[2], m[4], m[5]]], V = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+  for (let s = 0; s < 30; s++) {
+    if (Math.abs(A[0][1]) + Math.abs(A[0][2]) + Math.abs(A[1][2]) < 1e-12) break;
+    for (const [p, q] of [[0, 1], [0, 2], [1, 2]]) {
+      if (Math.abs(A[p][q]) < 1e-15) continue;
+      const th = (A[q][q] - A[p][p]) / (2 * A[p][q]), t = (th >= 0 ? 1 : -1) / (Math.abs(th) + Math.sqrt(th * th + 1)), c = 1 / Math.sqrt(t * t + 1), sn = t * c;
+      for (let k = 0; k < 3; k++) { const a = A[k][p], b = A[k][q]; A[k][p] = c * a - sn * b; A[k][q] = sn * a + c * b; }
+      for (let k = 0; k < 3; k++) { const a = A[p][k], b = A[q][k]; A[p][k] = c * a - sn * b; A[q][k] = sn * a + c * b; }
+      for (let k = 0; k < 3; k++) { const a = V[k][p], b = V[k][q]; V[k][p] = c * a - sn * b; V[k][q] = sn * a + c * b; }
+    }
+  }
+  return [0, 1, 2].map(j => [V[0][j], V[1][j], V[2][j]]);
+}
+function extents(P, ax) {
+  const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < P.length; i += 3) for (let a = 0; a < 3; a++) { const d = P[i] * ax[a][0] + P[i + 1] * ax[a][1] + P[i + 2] * ax[a][2]; if (d < mn[a]) mn[a] = d; if (d > mx[a]) mx[a] = d; }
+  return mx.map((v, a) => v - mn[a]);
+}
+function partStats(p) {
+  if (p.stats) return p.stats;
+  const P = p.geo.attributes.position.array, I = p.geo.index.array;
+  let vol = 0, area = 0; const bk = new Map();
+  for (let t = 0; t < I.length; t += 3) {
+    const a = I[t] * 3, b = I[t + 1] * 3, c = I[t + 2] * 3;
+    const ax = P[a], ay = P[a + 1], az = P[a + 2], bx = P[b], by = P[b + 1], bz = P[b + 2], cx = P[c], cy = P[c + 1], cz = P[c + 2];
+    const ux = bx - ax, uy = by - ay, uz = bz - az, vx = cx - ax, vy = cy - ay, vz = cz - az;
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const A2 = Math.hypot(nx, ny, nz); if (!A2) continue;
+    area += A2 / 2;
+    vol += (ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx)) / 6;
+    nx /= A2; ny /= A2; nz /= A2;
+    if (nx < -1e-6 || (Math.abs(nx) <= 1e-6 && (ny < -1e-6 || (Math.abs(ny) <= 1e-6 && nz < 0)))) { nx = -nx; ny = -ny; nz = -nz; }
+    const k = Math.round(nx * 30) + ',' + Math.round(ny * 30) + ',' + Math.round(nz * 30), e = bk.get(k) || [0, 0, 0, 0];
+    e[0] += nx * A2; e[1] += ny * A2; e[2] += nz * A2; e[3] += A2; bk.set(k, e);
+  }
+  // aday eksen takımları: model eksenleri, PCA, en büyük düzlem yüzlerin normalleri -> en küçük hacimli kutu
+  const cands = [[[1, 0, 0], [0, 1, 0], [0, 0, 1]]];
+  const nv = P.length / 3; let mx = 0, my = 0, mz = 0;
+  for (let i = 0; i < P.length; i += 3) { mx += P[i]; my += P[i + 1]; mz += P[i + 2]; }
+  mx /= nv; my /= nv; mz /= nv;
+  const cv = [0, 0, 0, 0, 0, 0];
+  for (let i = 0; i < P.length; i += 3) { const x = P[i] - mx, y = P[i + 1] - my, z = P[i + 2] - mz; cv[0] += x * x; cv[1] += x * y; cv[2] += x * z; cv[3] += y * y; cv[4] += y * z; cv[5] += z * z; }
+  cands.push(eig3(cv));
+  const nb = [...bk.values()].sort((a, b) => b[3] - a[3]);
+  if (nb.length) {
+    const n1 = new THREE.Vector3(nb[0][0], nb[0][1], nb[0][2]).normalize();
+    const e2 = nb.find(e => Math.abs(new THREE.Vector3(e[0], e[1], e[2]).normalize().dot(n1)) < 0.2);
+    let n2 = e2 ? new THREE.Vector3(e2[0], e2[1], e2[2]).normalize() : new THREE.Vector3(...cands[1][0]);
+    n2.addScaledVector(n1, -n2.dot(n1));
+    if (n2.lengthSq() < 1e-6) { n2 = new THREE.Vector3(Math.abs(n1.x) < 0.9 ? 1 : 0, Math.abs(n1.x) < 0.9 ? 0 : 1, 0); n2.addScaledVector(n1, -n2.dot(n1)); }
+    n2.normalize(); const n3 = new THREE.Vector3().crossVectors(n1, n2);
+    cands.push([n1.toArray(), n2.toArray(), n3.toArray()]);
+  }
+  let best = null, bv = Infinity;
+  for (const ax of cands) { const d = extents(P, ax), v = (d[0] + 1) * (d[1] + 1) * (d[2] + 1); if (v < bv - 1e-6) { bv = v; best = d; } }
+  const bb = p.geo.boundingBox, s = bb.getSize(new THREE.Vector3());
+  p.stats = { obb: best.slice().sort((a, b) => b - a), aabb: [s.x, s.y, s.z], vol: Math.abs(vol), area };
+  return p.stats;
+}
+function computeStatsAll() {
+  const nv = parts.reduce((s, p) => s + p.geo.attributes.position.count, 0);
+  if (nv < 1.5e6) parts.forEach(partStats);
+}
+// adsız gövdeler: aynı dosyada, aynı üst ad + aynı ölçü ve hacim -> tek satır ve adet
+function regroup() {
+  const kinds = new Map();
+  for (const p of parts) {
+    if (p.named || !p.stats) continue;
+    const s = p.stats;
+    p.key = `${p.fi}|~${p.owner}|${s.obb.map(v => Math.round(v)).join('x')}|${Math.round(Math.log(s.vol + 1) * 100)}`;
+    const fo = p.fi + '|' + p.owner, arr = kinds.get(fo) || []; if (!arr.includes(p.key)) arr.push(p.key); kinds.set(fo, arr);
+  }
+  for (const p of parts) {
+    if (p.named || !p.stats) continue;
+    const arr = kinds.get(p.fi + '|' + p.owner), base = p.owner || 'Gövde';
+    p.name = arr.length > 1 ? `${base} · tip ${arr.indexOf(p.key) + 1}` : base;
+  }
+}
+const lenOf = p => p.stats ? p.stats.obb[0] : Math.max(...p.geo.boundingBox.getSize(new THREE.Vector3()).toArray());
+
+// ---------- parça tablosu ----------
+function groupsOf(fi) {
+  const g = new Map();
+  for (const p of parts) if (fi === undefined || p.fi === fi) { const e = g.get(p.key) || { n: 0, p }; e.n++; g.set(p.key, e); }
+  return [...g.values()].sort((a, b) => a.p.name.localeCompare(b.p.name, 'tr', { numeric: true }));
+}
+function rowHtml(e) {
+  const c = e.p.base.toString(16).padStart(6, '0'), L = lenOf(e.p);
+  return `<div class="r" data-k="${esc(e.p.key)}"><i style="background:#${c}"></i><span>${esc(e.p.name)}</span><b>${e.n}</b><b>${e.p.stats ? '' : '≈'}${fmt(L, 0)}</b></div>`;
+}
+function buildParts() {
+  const multi = files.length > 1;
+  let h = `<h3>Parçalar · ${multi ? files.length + ' dosya · ' : ''}${parts.length} gövde</h3>`;
+  if (loadWarn.length) h += `<div class="warnbox"><b>Açılamayan ${loadWarn.length} dosya:</b> ${loadWarn.map(w => `${esc(w[0])} <small>(${esc(w[1])})</small>`).join('<br>')}</div>`;
+  h += `<div class="r hd"><i style="visibility:hidden"></i><span>Ad</span><b>Adet</b><b title="Parçanın kendi ekseni boyunca en büyük ölçüsü (mm)">Boy</b></div>`;
+  if (multi) files.forEach((f, fi) => {
+    const n = parts.filter(p => p.fi === fi).length;
+    h += `<div class="fh" data-f="${fi}"><span>${esc(f.name)} <small>· ${n} gövde</small></span></div>` + groupsOf(fi).map(rowHtml).join('');
+  });
+  else h += groupsOf().map(rowHtml).join('');
+  h += `<div class="note">Boy = parçanın kendi ekseni boyunca en büyük ölçüsü (mm). Adı olmayan gövdeler, ölçüsü ve hacmi aynıysa tek satırda sayılır (ayna simetrikler de). Satıra tıklayınca parça seçilir; ölçüleri, hacmi ve ağırlığı görünür.${multi ? ' Dosya adına tıklayınca o dosyanın tamamı seçilir.' : ''}</div>`;
+  partsBody.innerHTML = h; partsEl.hidden = false;
+  partsBody.querySelectorAll('.r:not(.hd)').forEach(r => r.onclick = () => select(selKey === r.dataset.k ? null : r.dataset.k));
+  partsBody.querySelectorAll('.fh').forEach(r => r.onclick = () => select(selKey === 'f|' + r.dataset.f ? null : 'f|' + r.dataset.f));
+}
+const selected = p => !!selKey && (p.key === selKey || selKey === 'f|' + p.fi);
+function applyVis() {
+  for (const p of parts) {
+    p.obj.visible = !isoKey || p.key === isoKey || isoKey === 'f|' + p.fi;
+    const on = selected(p), dim = selKey && !on, op = dim ? 0.18 : (xray && !on ? 0.35 : 1);
+    p.mat.color.setHex(on ? 0xe8641b : p.base);
+    p.mat.transparent = op < 1; p.mat.opacity = op; p.mat.depthWrite = op === 1;
+  }
+  partsBody.querySelectorAll('.r[data-k]').forEach(r => r.classList.toggle('on', r.dataset.k === selKey));
+  partsBody.querySelectorAll('.fh').forEach(r => r.classList.toggle('on', 'f|' + r.dataset.f === selKey));
+  drawDims();
+}
+const dimsXYZ = s => (zUp ? [s.x, s.z, s.y] : [s.x, s.y, s.z]);
+function select(k) {
+  selKey = k;
+  if (!k || !parts.some(selected)) { selKey = null; applyVis(); info.style.display = 'none'; return; }
+  applyVis();
+  const ps = parts.filter(selected);
+  let h;
+  if (k.startsWith('f|')) {
+    const f = files[+k.slice(2)], bb = new THREE.Box3(); ps.forEach(p => bb.expandByObject(p.obj));
+    const [X, Y, Z] = dimsXYZ(bb.getSize(new THREE.Vector3()));
+    const vol = ps.reduce((s, p) => s + partStats(p).vol, 0);
+    h = `<b>${esc(f.name)}</b><br><small>${ps.length} gövde${f.item && f.item.size ? ' · ' + fmtSize(f.item.size) : ''}</small>
+      <table><tr><th>Gabari (X × Y × Z)</th><td>${fmt(X)} × ${fmt(Y)} × ${fmt(Z)} mm</td></tr>
+      <tr><th>Toplam hacim</th><td>${fmt(vol / 1000, 1)} cm³</td></tr>
+      <tr><th>Ağırlık ≈</th><td>alü ${fmt(vol * 2.7e-6, 2)} kg · çelik ${fmt(vol * 7.85e-6, 2)} kg</td></tr></table>`;
+  } else {
+    const p = ps[0], st = partStats(p), [X, Y, Z] = st.aabb;
+    h = `<b>${esc(p.name)}</b><br><small>${esc(p.file)}</small>
+      <table><tr><th>Kendi kutusu (boy × en × yük.)</th><td>${st.obb.map(v => fmt(v)).join(' × ')} mm</td></tr>
+      <tr><th>Model eksenlerinde (X × Y × Z)</th><td>${fmt(X)} × ${fmt(Y)} × ${fmt(Z)} mm</td></tr>
+      <tr><th>Hacim</th><td>${fmt(st.vol / 1000, 1)} cm³</td></tr>
+      <tr><th>Ağırlık ≈</th><td>alü (2,70) ${fmt(st.vol * 2.7e-6, 2)} kg · çelik (7,85) ${fmt(st.vol * 7.85e-6, 2)} kg</td></tr>
+      <tr><th>Yüzey alanı</th><td>${fmt(st.area / 1e6, 3)} m²</td></tr>
+      ${ps.length > 1 ? `<tr><th>Bu adla</th><td>${ps.length} adet</td></tr>` : ''}</table>`;
+  }
+  h += `<div class="ibtn"><button id="isobtn" class="${isoKey ? 'on' : ''}">${isoKey ? 'Hepsini göster' : 'Yalnız bunu göster'}</button><button id="selzoom">Yakınlaş</button></div>
+    <small>Hacim ve ağırlık, model kapalı katıysa doğrudur.</small>`;
+  infoBody.innerHTML = h; info.style.display = 'block';
+  $('#isobtn').onclick = () => { isoKey = isoKey ? null : selKey; applyVis(); select(selKey); fit(); };
+  $('#selzoom').onclick = () => { const bb = new THREE.Box3(); parts.filter(selected).forEach(p => bb.expandByObject(p.obj)); if (!bb.isEmpty()) fitBox(bb, undefined, isOrtho()); };
+}
+
+// ---------- gabari ölçü çizgileri ----------
+const dimGroup = new THREE.Group(); scene.add(dimGroup);
+const dimMat = new THREE.LineBasicMaterial({ color: 0x1f6fb2, depthTest: false });
+const dimLabels = [];
+function clearDims() { while (dimGroup.children.length) { const c = dimGroup.children[0]; c.geometry.dispose(); dimGroup.remove(c); } dimLabels.forEach(l => l.el.remove()); dimLabels.length = 0; }
+function dimLine(a, b, txt) {
+  const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]), dimMat); l.renderOrder = 997; dimGroup.add(l);
+  const el = document.createElement('div'); el.className = 'mlabel dim'; el.textContent = txt; labelsEl.append(el);
+  dimLabels.push({ el, a: a.clone(), b: b.clone(), p: a.clone().add(b).multiplyScalar(0.5) });
+}
+function ext(a, b) { const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]), dimMat); l.renderOrder = 997; dimGroup.add(l); }
+function drawDims() {
+  clearDims();
+  if (!showDims || !root) return;
+  const bb = new THREE.Box3();
+  for (const p of parts) if ((selKey ? selected(p) : true) && p.obj.visible) bb.expandByObject(p.obj);
+  if (bb.isEmpty()) return;
+  const s = bb.getSize(new THREE.Vector3()), o = Math.max(12, Math.min(s.y, s.z, s.x) * 0.25 + Math.max(s.x, s.y, s.z) * 0.04), e = o * 0.35;
+  const { min, max } = bb;
+  dimLine(new THREE.Vector3(min.x, min.y - o, max.z), new THREE.Vector3(max.x, min.y - o, max.z), fmt(s.x) + ' mm');
+  ext(new THREE.Vector3(min.x, min.y, max.z), new THREE.Vector3(min.x, min.y - o - e, max.z));
+  ext(new THREE.Vector3(max.x, min.y, max.z), new THREE.Vector3(max.x, min.y - o - e, max.z));
+  dimLine(new THREE.Vector3(min.x - o, min.y, max.z), new THREE.Vector3(min.x - o, max.y, max.z), fmt(s.y) + ' mm');
+  ext(new THREE.Vector3(min.x, min.y, max.z), new THREE.Vector3(min.x - o - e, min.y, max.z));
+  ext(new THREE.Vector3(min.x, max.y, max.z), new THREE.Vector3(min.x - o - e, max.y, max.z));
+  dimLine(new THREE.Vector3(min.x - o, min.y - o, min.z), new THREE.Vector3(min.x - o, min.y - o, max.z), fmt(s.z) + ' mm');
+  ext(new THREE.Vector3(min.x, min.y, min.z), new THREE.Vector3(min.x - o - e, min.y - o - e, min.z));
+}
+
+// ---------- kamera ----------
+const DIRS = { iso: [0.85, 0.75, 1.25], top: [0, 1, 0.0001], bottom: [0, -1, 0.0001], front: [0, 0, 1], back: [0, 0, -1], left: [-1, 0, 0], right: [1, 0, 0] };
+const ORTHO_VIEWS = new Set(['top', 'bottom', 'front', 'back', 'left', 'right']);
+let curView = 'iso', forcePersp = false, lastFit = null, userMoved = false, occR = -1;
+function visBox() {
+  const vis = new THREE.Box3(); root?.traverse(o => { if (o.isMesh && o.userData.part && o.visible) vis.expandByObject(o); });
+  return vis.isEmpty() ? box.clone() : vis;
+}
+function panelOcc() {
+  const o = partsEl.offsetWidth + 20;
+  return !partsEl.hidden && !partsEl.classList.contains('pgizli') && view.clientWidth - o >= 280 ? o : 0;
+}
+function applyOffset(force) {
+  const o = panelOcc(); if (o === occR && !force) return; occR = o;
+  const w = view.clientWidth, h = view.clientHeight; if (!w || !h) return;
+  if (o) camera.setViewOffset(w, h, o / 2, 0, w, h); else camera.clearViewOffset();
+  camera.updateProjectionMatrix();
+}
+function fitBox(bb, dir, wantOrtho) {
+  lastFit = () => fitBox(bb.clone(), dir && dir.isVector3 ? dir.clone() : dir, wantOrtho); userMoved = false;
+  useCam(wantOrtho && !forcePersp ? ortho : persp);
+  applyOffset();
+  const c = bb.getCenter(new THREE.Vector3()); radius = bb.getSize(new THREE.Vector3()).length() / 2 || 100;
+  const asp = Math.max(0.3, (view.clientWidth - Math.max(occR, 0)) / Math.max(1, view.clientHeight));
+  const v = dir && dir.isVector3 ? dir.clone().normalize()
+    : DIRS[dir] ? new THREE.Vector3(...DIRS[dir]).normalize() : camera.position.clone().sub(controls.target).normalize();
+  const R = new THREE.Vector3().crossVectors(camera.up, v); if (R.lengthSq() < 1e-12) R.set(1, 0, 0); R.normalize();
+  const U = new THREE.Vector3().crossVectors(v, R);
+  let hw = 1, hh = 1, hd = 0;
+  for (let i = 0; i < 8; i++) {
+    const p = new THREE.Vector3(i & 1 ? bb.max.x : bb.min.x, i & 2 ? bb.max.y : bb.min.y, i & 4 ? bb.max.z : bb.min.z).sub(c);
+    hw = Math.max(hw, Math.abs(p.dot(R))); hh = Math.max(hh, Math.abs(p.dot(U))); hd = Math.max(hd, p.dot(v));
+  }
+  const L = box.getSize(new THREE.Vector3()).length() || 1000;
+  if (isOrtho()) {
+    orthoH = Math.max(hh, hw / asp) * 1.12; ortho.zoom = 1;
+    orthoFrustum(); applyOffset(true);
+    camera.position.copy(c).addScaledVector(v, L * 2 + hd);
+    controls.target.copy(c);
+  } else {
+    const tv = Math.tan(THREE.MathUtils.degToRad(persp.fov / 2)), dist = Math.max(hh / tv, hw / (tv * asp)) * 1.12 + hd;
+    camera.position.copy(c).addScaledVector(v, dist);
+    controls.target.copy(c); controls.minDistance = Math.max(0.5, radius / 400); controls.maxDistance = Math.max(dist * 6, L * 4);
+  }
+  controls.update(); nearFar();
+}
+function fit(dir) {
+  if (!root) return;
+  const vb = visBox();
+  if (showDims && !vb.isEmpty()) {   // gabari çizgileri (altta ve solda) görünsün
+    const s = vb.getSize(new THREE.Vector3()), off = (Math.max(12, Math.min(s.y, s.z, s.x) * 0.25 + Math.max(s.x, s.y, s.z) * 0.04)) * 1.6;
+    vb.min.y -= off; vb.min.x -= off;
+  }
+  if (fileLabels.length && showNames && layout === 'yan' && !vb.isEmpty()) vb.min.x -= vb.getSize(new THREE.Vector3()).x * 0.14;   // soldaki dosya adları sığsın
+  const o = typeof dir === 'string' ? ORTHO_VIEWS.has(dir) : dir === undefined ? isOrtho() : false;
+  fitBox(vb, dir, o);
+}
+function nearFar() {
+  const d = camera.position.distanceTo(controls.target), L = box.getSize(new THREE.Vector3()).length() || 1000;
+  if (isOrtho()) { camera.near = 0.1; camera.far = d + L * 4; }
+  else { camera.near = Math.max(0.05, Math.min(d / 60, L / 100)); camera.far = d + L * 4; }
+  camera.updateProjectionMatrix();
+}
+controls.addEventListener('change', nearFar);
+controls.addEventListener('start', () => { userMoved = true; });
+
+// ---------- kesit (X/Y/Z = model eksenleri) ----------
+renderer.localClippingEnabled = true;
+let secOn = false, secAxis = 0, secFlip = false, secT = 0.5;
+const sceneAx = a => (zUp ? [0, 2, 1][a] : a);
+const secPlane = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0), PL_ON = [secPlane], PL_OFF = [];
+function applySection() {
+  const planes = secOn ? PL_ON : PL_OFF;
+  root?.traverse(o => { const m = o.material; if (m && m !== edgeMat && m.clippingPlanes !== planes) { m.clippingPlanes = planes; m.needsUpdate = true; } });
+  edgeMat.clippingPlanes = planes; edgeMat.needsUpdate = true;
+  $('#secbtn').classList.toggle('on', secOn); $('#secpanel').classList.toggle('show', secOn);
+  document.querySelectorAll('[data-ax]').forEach(b => b.classList.toggle('on', +b.dataset.ax === secAxis));
+  if (!secOn || !root) return;
+  const sa = sceneAx(secAxis), min = box.min.getComponent(sa), max = box.max.getComponent(sa), pos = min + (max - min) * secT;
+  secPlane.normal.set(0, 0, 0).setComponent(sa, secFlip ? 1 : -1);
+  secPlane.constant = secFlip ? -pos : pos;
+  $('#secval').textContent = 'XYZ'[secAxis] + ' ' + fmt(pos - min, 0) + ' mm';
+}
+function setSection(on) { secOn = on; applySection(); }
+
+// ---------- açılım ----------
+let explode = 0;
+const expPos = $('#exppos');
+function setExplode(f) {
+  explode = f; $('#expval').textContent = '%' + Math.round(f * 100); $('#expbtn').classList.toggle('on', f > 0);
+  if (!root) return;
+  for (const p of parts) p.obj.position.copy(p.obj.parent.worldToLocal(p.homeW.clone().addScaledVector(p.dirW, f * 1.2)));
+  root.updateMatrixWorld(true); box.setFromObject(root); labelTops(); applySection(); drawDims();
+}
+
+// ---------- ölçü (iki nokta; ekranda ~14 px içindeki köşeye yakalar) ----------
+let measOn = false, pending = null; const measures = [];
+const measGroup = new THREE.Group(); scene.add(measGroup);
+const markerGeo = new THREE.SphereGeometry(1, 12, 10);
+const markerMat = new THREE.MeshBasicMaterial({ color: 0xe8641b, depthTest: false });
+const lineMat = new THREE.LineBasicMaterial({ color: 0xe8641b, depthTest: false });
+const measOut = $('#measout'), MEAS0 = 'İki noktaya tıklayın (köşeye yakalar)';
+function marker(p) { const m = new THREE.Mesh(markerGeo, markerMat); m.position.copy(p); m.scale.setScalar(Math.max(mmPerPx() * 4, 0.05)); m.renderOrder = 999; measGroup.add(m); return m; }
+function snapPoint(hit) {
+  const f = hit.face; if (!f) return hit.point.clone();
+  const pos = hit.object.geometry.attributes.position, w = view.clientWidth / 2, h = view.clientHeight / 2;
+  const hp = hit.point.clone().project(camera); let best = hit.point.clone(), bd = 14;
+  for (const i of [f.a, f.b, f.c]) {
+    const v = new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(hit.object.matrixWorld), vp = v.clone().project(camera);
+    const d = Math.hypot((vp.x - hp.x) * w, (vp.y - hp.y) * h); if (d < bd) { bd = d; best = v; }
+  }
+  return best;
+}
+function addMeasurePoint(p) {
+  if (!pending) { pending = { a: p, ma: marker(p) }; measOut.textContent = 'İkinci noktaya tıklayın'; return; }
+  const a = pending.a, b = p, d = a.distanceTo(b), [dx, dy, dz] = dimsXYZ(new THREE.Vector3(Math.abs(b.x - a.x), Math.abs(b.y - a.y), Math.abs(b.z - a.z)));
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]), lineMat); line.renderOrder = 998; measGroup.add(line);
+  const label = document.createElement('div'); label.className = 'mlabel';
+  label.innerHTML = `${fmt(d)} mm<small>X ${fmt(dx)} · Y ${fmt(dy)} · Z ${fmt(dz)}</small>`;
+  labelsEl.append(label);
+  measures.push({ a, b, objs: [pending.ma, marker(b), line], label }); pending = null;
+  measOut.textContent = `${fmt(d)} mm  (X ${fmt(dx, 0)} · Y ${fmt(dy, 0)} · Z ${fmt(dz, 0)})`;
+}
+function undoMeasure() {
+  if (pending) { measGroup.remove(pending.ma); pending = null; measOut.textContent = MEAS0; return; }
+  const m = measures.pop(); if (!m) return; m.objs.forEach(o => measGroup.remove(o)); m.label.remove();
+  measOut.textContent = measures.length ? 'Son ölçü silindi' : MEAS0;
+}
+function clearMeasures() { while (measures.length || pending) undoMeasure(); measOut.textContent = MEAS0; }
+function place(el, p3) {
+  const w = view.clientWidth, h = view.clientHeight, p = p3.clone().project(camera), vis = p.z < 1 && p.z > -1;
+  el.style.display = vis ? '' : 'none'; if (!vis) return;
+  el.style.left = (p.x + 1) / 2 * w + 'px'; el.style.top = (1 - p.y) / 2 * h + 'px';
+}
+function updateLabels() {
+  for (const m of measures) place(m.label, m.a.clone().add(m.b).multiplyScalar(0.5));
+  for (const l of dimLabels) {
+    const w = view.clientWidth, h = view.clientHeight, a = l.a.clone().project(camera), b = l.b.clone().project(camera);
+    if (Math.hypot((a.x - b.x) * w / 2, (a.y - b.y) * h / 2) < 40) { l.el.style.display = 'none'; continue; }
+    place(l.el, l.p);
+  }
+  const taken = [];   // dosya adları üst üste binmesin: çakışan etiket gizlenir
+  for (const l of fileLabels) {
+    if (!showNames || !l.p || (isoKey && isoKey !== 'f|' + l.fi && !parts.some(p => p.fi === l.fi && p.obj.visible))) { l.el.style.display = 'none'; continue; }
+    place(l.el, l.p); if (l.el.style.display === 'none') continue;
+    if (!l.w) { l.w = l.el.offsetWidth; l.h = l.el.offsetHeight; }
+    const x = parseFloat(l.el.style.left), y = parseFloat(l.el.style.top), left = l.el.classList.contains('left');
+    const r = left ? [x - l.w - 8, y - l.h / 2, x - 8, y + l.h / 2] : [x - l.w / 2, y - l.h * 1.2, x + l.w / 2, y - l.h * 0.2];
+    if (taken.some(t => r[0] < t[2] + 2 && r[2] > t[0] - 2 && r[1] < t[3] + 1 && r[3] > t[1] - 1)) { l.el.style.display = 'none'; continue; }
+    taken.push(r);
+  }
+}
+function setMeasure(on) { measOn = on; $('#measbtn').classList.toggle('on', on); $('#measpanel').classList.toggle('show', on); renderer.domElement.classList.toggle('meas', on); if (!on && pending) undoMeasure(); }
+
+// ---------- seçim / ölçü için ışın ----------
+const ray = new THREE.Raycaster(), ptr = new THREE.Vector2();
+function pick(e) {
+  if (!root) return null;
+  const r = renderer.domElement.getBoundingClientRect();
+  ptr.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
+  ray.setFromCamera(ptr, camera);
+  return ray.intersectObject(root, true).find(h => h.object.isMesh && h.object.userData.part && h.object.visible
+    && h.object.material.opacity > 0.2 && (!secOn || secPlane.distanceToPoint(h.point) >= 0)) || null;
+}
+
+// ---------- yakınlaştırma ----------
+function yakinlas(k, e) {
+  if (!root) return;
+  userMoved = true;
+  if (isOrtho()) {
+    const z0 = ortho.zoom, z1 = Math.min(2000, Math.max(0.02, z0 / k)), f = z0 / z1;
+    if (Math.abs(f - 1) < 1e-4) return;
+    if (e) {   // imlecin altındaki nokta yerinde kalsın
+      const r = renderer.domElement.getBoundingClientRect();
+      const q = new THREE.Vector3((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1, 0).unproject(camera);
+      const vd = camera.getWorldDirection(new THREE.Vector3()), d = q.sub(controls.target.clone()); d.addScaledVector(vd, -d.dot(vd));
+      controls.target.addScaledVector(d, 1 - f); camera.position.addScaledVector(d, 1 - f);
+    }
+    ortho.zoom = z1; ortho.updateProjectionMatrix(); controls.update(); return;
+  }
+  const hit = e && k < 1 ? pick(e) : null, p = hit ? hit.point : controls.target.clone();
+  const dist = camera.position.distanceTo(controls.target), f = Math.min(controls.maxDistance, Math.max(controls.minDistance, dist * k)) / dist;
+  if (Math.abs(f - 1) < 1e-4) return;
+  camera.position.sub(p).multiplyScalar(f).add(p); controls.target.sub(p).multiplyScalar(f).add(p); controls.update(); nearFar();
+}
+view.addEventListener('wheel', e => {
+  if (!root || e.target.closest('.pnl,#tools')) return; e.preventDefault(); e.stopPropagation();
+  const dy = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 100 : 1);
+  yakinlas(1 + 0.12 * Math.max(-1, Math.min(1, dy / 100)), e);
+}, { capture: true, passive: false });
+const tBox = new THREE.Box3();
+controls.addEventListener('change', () => {
+  if (!root || box.isEmpty()) return;
+  tBox.copy(box).expandByVector(box.getSize(new THREE.Vector3()).multiplyScalar(0.25));
+  if (!tBox.containsPoint(controls.target)) tBox.clampPoint(controls.target, controls.target);
+});
+let down = null;
+renderer.domElement.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4 || !root) return;
+  const hit = pick(e);
+  if (measOn) { if (hit) addMeasurePoint(snapPoint(hit)); return; }
+  select(hit ? (hit.object.userData.part.key === selKey ? null : hit.object.userData.part.key) : null);
+});
+renderer.domElement.addEventListener('dblclick', e => {
+  if (!root || measOn) return;
+  const hit = pick(e); if (hit) { controls.target.copy(hit.point); controls.update(); } else fit();
+});
+
+// ================= klasör gezgini =================
+const S = { pk: null, rootName: '', path: '/', items: null, isFile: false, scan: null, busy: 0, cur: [], byPath: new Map(), visible: [] };
+const listEl = $('#list');
+function showList(html) { listEl.innerHTML = html; }
+function recents() { return lsGetJ('ysv_recent', []); }
+function addRecent(pk, path, name) {
+  const r = recents().filter(x => !(x.pk === pk && x.path === path));
+  r.unshift({ pk, path, name, t: Date.now() }); lsSetJ('ysv_recent', r.slice(0, 8));
+}
+const webUrl = (pk, path) => pk + (path && path !== '/' ? path.split('/').map(encodeURIComponent).join('/') : '');
+function startScreen() {
+  S.pk = null; S.items = null; S.scan = null; $('#crumbs').innerHTML = ''; $('#scanbtn').hidden = true; $('#openall').hidden = true;
+  const rc = recents();
+  showList(`<div class="start"><p><b>Nasıl kullanılır?</b></p><ol>
+    <li>Yandex Disk'te klasörü ya da dosyayı açın, <b>Paylaş</b> ile bağlantıyı kopyalayın.</li>
+    <li>Yukarıdaki kutuya yapıştırın. Klasördeki STEP dosyaları listelenir; <b>Alt klasörler dahil</b> ile altındaki tüm klasörler taranır.</li>
+    <li>Dosyaya tıklayın; model tarayıcıda açılır. Kurulum gerekmez.</li></ol>
+    ${rc.length ? '<h4>Son açılanlar</h4>' + rc.map((x, i) => `<button class="rc" data-rc="${i}">${esc(x.name || x.path)}<small>${esc(webUrl(x.pk, x.path))}</small></button>`).join('') : ''}
+    ${EXAMPLE ? `<h4>Örnek</h4><button class="rc" data-ex="1">Matisse · Sipariş Modelleri<small>${esc(decodeURIComponent(EXAMPLE))}</small></button>` : ''}</div>`);
+  listEl.querySelectorAll('[data-rc]').forEach(b => b.onclick = () => { const x = rc[+b.dataset.rc]; openLink({ pk: x.pk, path: x.path }); });
+  const ex = listEl.querySelector('[data-ex]'); if (ex) ex.onclick = () => openLink(EXAMPLE);
+}
+async function openLink(raw, opts = {}) {
+  const L = typeof raw === 'string' ? parseLink(raw) : raw;
+  if (!L) { showList(`<div class="lmsg err">Bu bir Yandex Disk paylaşım bağlantısı değil. Bağlantı <b>https://disk.yandex.com/d/…</b> ya da <b>yadi.sk/d/…</b> gibi başlamalı.</div>`); return; }
+  if (L.private) { showList(`<div class="lmsg err">Bu, kendi Yandex hesabınızın iç adresi; başkaları açamaz. Klasöre sağ tıklayıp <b>Paylaş</b> ile oluşan bağlantıyı yapıştırın.</div>`); return; }
+  $('#link').value = webUrl(L.pk, L.path);
+  if (S.pk !== L.pk) {
+    S.pk = L.pk; S.rootName = '';
+    api('', { public_key: L.pk, limit: 0 }).then(d => { if (S.pk === L.pk) { S.rootName = d.name || ''; renderCrumbs(); if (!S.isFile) addRecent(S.pk, S.path, crumbName()); } }).catch(() => {});
+  }
+  await loadDir(L.path, opts);
+}
+const crumbName = () => { const segs = S.path.split('/').filter(Boolean); return (S.rootName || 'Paylaşım') + (segs.length ? ' / ' + segs[segs.length - 1] : ''); };
+async function loadDir(path, opts = {}) {
+  const my = ++S.busy; S.scan = null;
+  showList('<div class="lmsg">Yandex klasörü okunuyor…</div>');
+  let d;
+  try { d = await listDir(S.pk, path); } catch (e) { if (my === S.busy) { showList(`<div class="lmsg err">${esc(errText(e))}</div>`); $('#crumbs').innerHTML = ''; } return; }
+  if (my !== S.busy) return;
+  S.path = path;
+  if (!d.items) { S.isFile = true; S.items = [d.meta]; }
+  else { S.isFile = false; S.items = d.items; if (S.rootName) addRecent(S.pk, path, crumbName()); }
+  S.byPath = new Map(S.items.map(i => [i.path || '/', i]));
+  renderCrumbs(); renderList(); setHash();
+  const cads = S.items.filter(i => i.type === 'file' && CAD_RE.test(i.name));
+  if (opts.file) { const it = S.byPath.get(opts.file) || (S.isFile ? S.items[0] : null); if (it) return openFiles([it]); }
+  if (S.isFile) { if (cads.length) openFiles(cads); else showList(`<div class="lmsg err">Bu bağlantı bir dosyaya gidiyor ama STEP değil (${esc(d.meta.name)}).</div>`); return; }
+  if (!cads.length && S.items.some(i => i.type === 'dir')) return scanAll();
+  if (!files.length && cads.length) openFiles([cads[0]]);
+}
+function renderCrumbs() {
+  const el = $('#crumbs');
+  if (!S.pk) { el.innerHTML = ''; return; }
+  const segs = S.isFile ? [] : S.path.split('/').filter(Boolean);
+  let acc = '', h = `<button data-p="/" class="${segs.length || S.isFile ? '' : 'cur'}">${esc(S.rootName || 'Paylaşım')}</button>`;
+  segs.forEach((s, i) => { acc += '/' + s; h += `<span>/</span><button data-p="${esc(acc)}" class="${i === segs.length - 1 ? 'cur' : ''}">${esc(s)}</button>`; });
+  el.innerHTML = h;
+  el.querySelectorAll('button:not(.cur)').forEach(b => b.onclick = () => loadDir(b.dataset.p));
+}
+function fileRow(it) {
+  return `<button class="it" data-file="${esc(it.path)}" title="${esc(it.path)}">${ICON_CAD}<span>${esc(it.name)}</span><b>${fmtSize(it.size)}</b></button>`;
+}
+function renderList() {
+  if (!S.items) return;
+  const q = $('#q').value.trim().toLocaleLowerCase('tr'), m = s => !q || s.toLocaleLowerCase('tr').includes(q);
+  let h = '', vis = [];
+  if (S.scan) {
+    const base = S.scan.base === '/' ? '' : S.scan.base, groups = new Map();
+    for (const it of S.scan.found) {
+      const dir = it.path.slice(0, it.path.lastIndexOf('/')), rel = dir.slice(base.length).replace(/^\//, '') || '(bu klasör)';
+      if (!m(it.name) && !m(rel)) continue;
+      (groups.get(rel) || groups.set(rel, []).get(rel)).push(it);
+    }
+    const keys = [...groups.keys()].sort((a, b) => a === '(bu klasör)' ? -1 : b === '(bu klasör)' ? 1 : a.localeCompare(b, 'tr', { numeric: true }));
+    const nf = keys.reduce((s, k) => s + groups.get(k).length, 0);
+    h += `<div class="lhd"><span>${nf} dosya · ${S.scan.dirs} klasör tarandı${S.scan.capped ? ' (sınır: ' + MAX_DIRS + ')' : ''}</span><button id="scanoff" type="button">Klasör görünümü</button></div>`;
+    if (S.scan.errs) h += `<div class="other">${S.scan.errs} klasör okunamadı.</div>`;
+    for (const k of keys) { const its = groups.get(k).sort((a, b) => a.name.localeCompare(b.name, 'tr', { numeric: true })); h += `<h4>${esc(k)}</h4>` + its.map(fileRow).join(''); vis.push(...its); }
+    if (!nf) h += `<div class="lmsg">${q ? 'Aramaya uyan dosya yok.' : 'Bu klasörün altında STEP dosyası bulunamadı.'}</div>`;
+  } else {
+    const dirs = S.items.filter(i => i.type === 'dir' && m(i.name)).sort((a, b) => a.name.localeCompare(b.name, 'tr', { numeric: true }));
+    const cads = S.items.filter(i => i.type === 'file' && CAD_RE.test(i.name) && m(i.name)).sort((a, b) => a.name.localeCompare(b.name, 'tr', { numeric: true }));
+    const other = S.items.filter(i => i.type === 'file' && !CAD_RE.test(i.name)).length;
+    h += dirs.map(it => `<button class="it dir" data-dir="${esc(it.path)}">${ICON_DIR}<span>${esc(it.name)}</span></button>`).join('');
+    if (cads.length) h += (dirs.length ? '<h4>STEP dosyaları</h4>' : '') + cads.map(fileRow).join('');
+    if (other) h += `<div class="other">STEP olmayan ${other} dosya gösterilmiyor.</div>`;
+    if (!dirs.length && !cads.length) h += `<div class="lmsg">${q ? 'Aramaya uyan dosya yok.' : 'Bu klasörde STEP dosyası yok.'}</div>`;
+    vis = cads;
+    $('#scanbtn').hidden = S.isFile || !S.items.some(i => i.type === 'dir');
+  }
+  if (S.scan) $('#scanbtn').hidden = true;
+  S.visible = vis;
+  for (const it of vis) S.byPath.set(it.path, it);
+  showList(h);
+  const so = $('#scanoff'); if (so) so.onclick = () => { S.scan = null; renderList(); };
+  listEl.querySelectorAll('[data-dir]').forEach(b => b.onclick = () => loadDir(b.dataset.dir));
+  listEl.querySelectorAll('[data-file]').forEach(b => b.onclick = () => { const it = S.byPath.get(b.dataset.file); if (it) openFiles([it]); });
+  const oa = $('#openall'); oa.hidden = vis.length < 2; oa.textContent = `Hepsini birlikte aç (${vis.length})`;
+  markList();
+}
+function markList() { const cur = new Set(S.cur); listEl.querySelectorAll('[data-file]').forEach(b => b.classList.toggle('on', cur.has(b.dataset.file))); }
+async function scanAll() {
+  const my = ++S.busy, base = S.path, found = [], queue = [base];
+  let active = 0, dirs = 0, errs = 0, capped = false;
+  showList('<div class="lmsg">Alt klasörler taranıyor… <span id="scn"></span></div>'); $('#scanbtn').hidden = true;
+  await new Promise(resolve => {
+    const pump = () => {
+      if (my !== S.busy) return resolve();
+      while (active < 4 && queue.length) {
+        const p = queue.shift(); active++;
+        listDir(S.pk, p).then(d => { dirs++; for (const it of d.items || []) { if (it.type === 'dir') { if (dirs + queue.length + active < MAX_DIRS) queue.push(it.path); else capped = true; } else if (CAD_RE.test(it.name)) found.push(it); } })
+          .catch(() => { errs++; })
+          .finally(() => { active--; const s = $('#scn'); if (s) s.textContent = `${dirs} klasör · ${found.length} STEP`; if (!queue.length && !active) resolve(); else pump(); });
+      }
+    };
+    pump();
+  });
+  if (my !== S.busy) return;
+  S.scan = { base, found, dirs, errs, capped };
+  renderList();
+  if (!files.length && found.length) openFiles([S.visible[0] || found[0]]);
+}
+
+// ================= dosya açma =================
+let openSeq = 0;
+function showMsg(html, cls = '') { const m = $('#msg'); m.style.display = 'flex'; m.innerHTML = `<div class="box ${cls}">${html}</div>`; }
+async function pool(arr, n, fn) { let i = 0; await Promise.all(Array.from({ length: Math.min(n, arr.length) }, async () => { while (i < arr.length) { const k = i++; await fn(arr[k], k); } })); }
+async function openFiles(items, opts = {}) {
+  if (!items.length) return;
+  if (items.length > MAX_FILES) { showMsg(`${items.length} dosya birlikte açılamaz (en çok ${MAX_FILES}). Aramayla listeyi daraltın ya da alt klasöre girin.`, 'card'); return; }
+  const total = items.reduce((s, i) => s + (i.size || 0), 0);
+  if (!opts.force && total > BIG) {
+    showMsg(`<b>${items.length > 1 ? items.length + ' dosya, toplam ' : ''}${fmtSize(total)}</b><br>Büyük model; indirip açmak birkaç dakika sürebilir ve bilgisayarın belleğini zorlayabilir.<br><button id="goBig">Yine de aç</button><button class="alt" id="noBig">Vazgeç</button>`, 'card');
+    $('#goBig').onclick = () => openFiles(items, { force: true }); $('#noBig').onclick = () => { if (files.length) $('#msg').style.display = 'none'; else showMsg('Soldan bir STEP dosyası seçin'); };
+    return;
+  }
+  const my = ++openSeq, local = items[0].lf instanceof File;
+  S.cur = local ? [] : items.map(i => i.path); markList(); setHash();
+  const loaded = new Array(items.length), errs = [], prog = new Array(items.length).fill(0);
+  let done = 0, stage = '';
+  const draw = () => {
+    if (my !== openSeq) return;
+    const got = prog.reduce((s, v) => s + v, 0), pct = total ? Math.min(100, got / total * 100) : 0;
+    const first = engineReady ? '' : '<small>İlk açılışta okuma motoru (≈7 MB) bir kez indirilir.</small>';
+    showMsg(items.length > 1
+      ? `${done} / ${items.length} dosya hazır<br><small>${esc(stage)}</small><div class="pbar"><i style="width:${(done / items.length * 100).toFixed(1)}%"></i></div>${first}`
+      : `${esc(items[0].name)}<br><small>${esc(stage)}</small><div class="pbar"><i style="width:${(stage.startsWith('Model') ? 100 : pct).toFixed(1)}%"></i></div>${first}`);
+  };
+  stage = local ? 'Okunuyor…' : 'Yandex\'ten indiriliyor…'; draw();
+  await pool(items, 3, async (it, k) => {
+    try {
+      const ck = local ? null : S.pk + '|' + it.path + '|' + (it.md5 || it.modified || it.size);
+      let res = ck && cache.get(ck);
+      if (!res) {
+        let buf;
+        if (local) buf = new Uint8Array(await it.lf.arrayBuffer());
+        else buf = await download(S.pk, it.path, it.size, (g, t) => { prog[k] = g; if (items.length === 1) { stage = `Yandex'ten indiriliyor… ${fmtSize(g)}${t ? ' / ' + fmtSize(t) : ''}`; draw(); } });
+        if (my !== openSeq) return;
+        stage = items.length > 1 ? `${it.name} okunuyor…` : 'Model okunuyor (OpenCascade)… büyük dosyada biraz sürebilir'; draw();
+        res = await parseCAD(buf, extOf(it.name));
+        if (ck) cacheSet(ck, res);
+      }
+      loaded[k] = { name: it.name, path: it.path, res, item: it };
+    } catch (e) { errs.push([it.name, errText(e).replace(/\s*\(.*$/, '')]); }
+    done++; if (items.length > 1) draw();
+  });
+  if (my !== openSeq) return;
+  const ok = loaded.filter(Boolean);
+  if (!ok.length) { showMsg(esc(errs.length ? errs[0][1] : 'Dosya açılamadı.'), 'card err'); return; }
+  files = ok; loadWarn = errs;
+  buildScene();
+  $('#title').textContent = files.length > 1 ? `${files.length} dosya · ${local ? 'yerel' : crumbName()}` : files[0].name;
+  updateLinks();
+}
+function updateLinks() {
+  const yl = $('#ylink');
+  if (S.pk && S.cur.length) { yl.hidden = false; yl.href = S.isFile ? S.pk : webUrl(S.pk, S.cur.length === 1 ? S.cur[0] : S.path); }
+  else yl.hidden = true;
+  $('#copybtn').hidden = !/^https?:$/.test(location.protocol) || !S.pk;
+}
+// URL'de durum: #u=<bağlantı>&p=<klasör>&f=<dosya> (yenileyince ya da sitede yayınlanınca paylaşılabilir)
+function setHash() {
+  if (!S.pk) return;
+  const h = new URLSearchParams({ u: S.pk }); if (S.path && S.path !== '/') h.set('p', S.path); if (S.cur.length === 1 && !S.isFile) h.set('f', S.cur[0]);
+  try { history.replaceState(null, '', '#' + h.toString()); } catch (e) { /* korumalı çerçeve */ }
+  updateLinks();
+}
+function readHash() {
+  try {
+    const h = new URLSearchParams(location.hash.slice(1)); const u = h.get('u') || new URLSearchParams(location.search).get('link');
+    if (!u) return null;
+    if (h.get('u')) return { L: { pk: u, path: h.get('p') || '/' }, file: h.get('f') || undefined };
+    return { L: parseLink(u) };
+  } catch (e) { return null; }
+}
+
+// yerel dosya sürükle-bırak
+['dragenter', 'dragover'].forEach(t => document.addEventListener(t, e => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); view.classList.add('drop'); } }));
+['dragleave', 'drop'].forEach(t => document.addEventListener(t, e => { if (t === 'dragleave' && e.relatedTarget) return; view.classList.remove('drop'); }));
+document.addEventListener('drop', e => {
+  e.preventDefault(); view.classList.remove('drop');
+  const fl = [...(e.dataTransfer?.files || [])].filter(f => CAD_RE.test(f.name));
+  if (!fl.length) { showMsg('Bırakılan dosyalarda STEP / STP / IGES yok.', 'card'); return; }
+  openFiles(fl.map(f => ({ name: f.name, size: f.size, lf: f, path: 'yerel:' + f.name })));
+});
+
+// ================= düğmeler =================
+$('#lf').onsubmit = e => { e.preventDefault(); openLink($('#link').value); };
+$('#link').addEventListener('paste', () => setTimeout(() => openLink($('#link').value), 0));
+$('#q').oninput = () => renderList();
+$('#scanbtn').onclick = () => scanAll();
+$('#openall').onclick = () => openFiles(S.visible.slice());
+$('#copybtn').onclick = async () => {
+  const b = $('#copybtn'); try { await navigator.clipboard.writeText(location.href); b.textContent = 'Kopyalandı'; } catch (e) { b.textContent = 'Kopyalanamadı'; }
+  setTimeout(() => { b.textContent = 'Bağlantıyı kopyala'; }, 1600);
+};
+const setViewOn = v => { curView = v; document.querySelectorAll('[data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === v)); };
+document.querySelectorAll('[data-v]').forEach(b => b.onclick = () => { fit(b.dataset.v); setViewOn(b.dataset.v); });
+$('#fit').onclick = () => fit();
+$('#projbtn').onclick = () => { if (!root) return; const d = camera.position.clone().sub(controls.target).normalize(), o = !isOrtho(); forcePersp = !o; fitBox(visBox(), d, o); };
+$('#zin').onclick = () => yakinlas(0.7); $('#zout').onclick = () => yakinlas(1 / 0.7);
+$('#edges').onclick = e => { showEdges = !showEdges; e.target.classList.toggle('on', showEdges); root?.traverse(o => { if (o.userData.edge) o.visible = showEdges; }); };
+$('#xray').onclick = e => { xray = !xray; e.target.classList.toggle('on', xray); applyVis(); };
+$('#dimbtn').onclick = e => { showDims = !showDims; e.target.classList.toggle('on', showDims); drawDims(); };
+$('#zup').onclick = e => { zUp = !zUp; e.target.classList.toggle('on', zUp); lsSetJ('ysv_zup', zUp); if (files.length) { const k = selKey; buildScene(true); if (k) select(k); } };
+const setLayout = l => { layout = l; $('#lay-yan').classList.toggle('on', l === 'yan'); $('#lay-konum').classList.toggle('on', l === 'konum'); if (!root) return; expPos.value = 0; arrange(); afterLayout(); setExplode(0); clearMeasures(); applySection(); fit(curView); };
+$('#lay-yan').onclick = () => setLayout('yan'); $('#lay-konum').onclick = () => setLayout('konum');
+$('#namebtn').onclick = e => { showNames = !showNames; e.target.classList.toggle('on', showNames); };
+$('#secbtn').onclick = () => setSection(!secOn);
+document.querySelectorAll('[data-ax]').forEach(b => b.onclick = () => { secAxis = +b.dataset.ax; applySection(); });
+$('#secflip').onclick = () => { secFlip = !secFlip; $('#secflip').classList.toggle('on', secFlip); applySection(); };
+$('#secpos').oninput = e => { secT = e.target.value / 1000; applySection(); };
+$('#seclook').onclick = () => { if (!root) return; const d = secPlane.normal.clone().negate(); if (Math.abs(d.y) > 0.9) d.z += 0.0001; fitBox(visBox(), d, true); setViewOn(null); };
+$('#expbtn').onclick = () => { const on = !$('#exppanel').classList.contains('show'); $('#exppanel').classList.toggle('show', on); if (!on && explode > 0) { expPos.value = 0; setExplode(0); } };
+expPos.oninput = e => setExplode(e.target.value / 100);
+$('#expreset').onclick = () => { expPos.value = 0; setExplode(0); $('#exppanel').classList.remove('show'); };
+$('#measbtn').onclick = () => setMeasure(!measOn);
+$('#measundo').onclick = undoMeasure; $('#measclear').onclick = clearMeasures;
+document.addEventListener('keydown', e => {
+  if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName) || e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (k === 'f') fit(); else if (k === '+' || k === '=') yakinlas(0.8); else if (k === '-' || k === '_') yakinlas(1.25);
+  else if (k === 'k') setSection(!secOn); else if (k === 'a') $('#expbtn').click(); else if (k === 'm') setMeasure(!measOn);
+  else if (k === 'x') $('#xray').click(); else if (k === 'e') $('#edges').click(); else if (k === 'g') $('#dimbtn').click();
+  else if (k === 'o') $('#projbtn').click(); else if (k === 'n' && files.length > 1) $('#namebtn').click();
+  else if (e.key === 'Escape') { if (measOn) setMeasure(false); else if (isoKey) { isoKey = null; applyVis(); if (selKey) select(selKey); } else if (selKey) select(null); }
+  else if ('0123458'.includes(e.key)) { const v = { 0: 'iso', 1: 'top', 2: 'bottom', 3: 'front', 4: 'left', 5: 'right', 8: 'back' }[e.key]; fit(v); setViewOn(v); }
+});
+
+// ---------- 08.10 KURAL: her panelde "Gizle ✕" + "☰ ad" geri getirme sekmesi, H tuşu hepsini aç/kapa ----------
+const PG = [
+  { id: 'aside', el: $('aside'), ad: 'Dosyalar', host: $('#bar'), first: true, open: () => true },
+  { id: 'parts', el: partsEl, ad: 'Parçalar', host: view, cls: 'tr', open: () => !partsEl.hidden },
+  { id: 'info', el: info, ad: 'Parça bilgisi', host: view, cls: 'bl', open: () => info.style.display !== 'none' },
+  { id: 'sec', el: $('#secpanel'), ad: 'Kesit', sub: true, open: () => $('#secpanel').classList.contains('show') },
+  { id: 'exp', el: $('#exppanel'), ad: 'Açılım', sub: true, open: () => $('#exppanel').classList.contains('show') },
+  { id: 'meas', el: $('#measpanel'), ad: 'Ölçü', sub: true, open: () => $('#measpanel').classList.contains('show') },
+];
+const lsGet = k => { try { return localStorage.getItem('ysv_pgz_' + k) === '1'; } catch (e) { return false; } };
+const lsSet = (k, v) => { try { localStorage.setItem('ysv_pgz_' + k, v ? '1' : '0'); } catch (e) { /* depolama kapalı */ } };
+function pgzSet(o, v, save = true) {
+  o.gizli = v; o.el.classList.toggle('pgizli', v);
+  if (o.id === 'aside') document.body.classList.toggle('aside-gizli', v);
+  if (save) lsSet(o.id, v); pgzSync();
+}
+function pgzSync() { for (const o of PG) { if (!o.tab) continue; const h = !(o.gizli && o.open()); if (o.tab.hidden !== h) o.tab.hidden = h; } }
+for (const o of PG) {
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'pgz-b'; b.textContent = 'Gizle ✕';
+  b.title = 'Bu paneli gizle (H: tüm paneller)'; b.setAttribute('aria-label', 'Paneli gizle: ' + o.ad);
+  b.onclick = e => { e.stopPropagation(); pgzSet(o, true); };
+  o.sub ? o.el.append(b) : o.el.prepend(b);
+  const t = document.createElement('button'); t.type = 'button'; t.className = 'pgz-g' + (o.cls ? ' ' + o.cls : ''); t.hidden = true;
+  t.textContent = '☰ ' + o.ad; t.title = 'Paneli göster'; t.onclick = () => pgzSet(o, false);
+  if (o.sub) o.el.after(t); else if (o.first) o.host.prepend(t); else o.host.append(t);
+  o.tab = t; o.gizli = false;
+  if (lsGet(o.id)) pgzSet(o, true, false);
+}
+addEventListener('keydown', e => {
+  if (e.key !== 'h' && e.key !== 'H') return; const t = e.target;
+  if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) || e.ctrlKey || e.metaKey || e.altKey) return;
+  const v = PG.filter(o => o.open() && !o.gizli).length > 0;
+  for (const o of PG) if (o.open() || o.id === 'aside') pgzSet(o, v);
+});
+
+function resize() {
+  const w = view.clientWidth, h = view.clientHeight; if (!w || !h) return;
+  renderer.setSize(w, h, false); persp.aspect = w / h; persp.updateProjectionMatrix(); orthoFrustum(); applyOffset(true);
+  if (lastFit && !userMoved) lastFit();   // çerçeve geç genişlediyse dokunulmamış görünümü yeniden sığdır
+}
+new ResizeObserver(resize).observe(view); resize();
+renderer.setAnimationLoop(() => { applyOffset(); controls.update(); renderer.render(scene, camera); updateLabels(); pgzSync(); });
+
+// açılış: URL'deki bağlantı > son açılan > örnek klasör
+const st = readHash();
+if (st && st.L) openLink(st.L, { file: st.file });
+else if (recents().length || !EXAMPLE) startScreen();
+else openLink(EXAMPLE);
+window.__ysv = { get camera() { return camera; }, controls, box, get root() { return root; }, get parts() { return parts; }, get files() { return files; }, S, fit, select, openLink, openFiles, parseLink };
+</script>
+</body>
+</html>
