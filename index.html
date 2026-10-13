@@ -171,7 +171,7 @@
       <span id="title">—</span>
       <span class="grp"><button data-v="iso" class="on" title="İzometrik (0)">İzo</button><button data-v="top" title="Üstten (1)">Üst</button><button data-v="bottom" title="Alttan (2)">Alt</button><button data-v="front" title="Önden (3)">Ön</button><button data-v="back" title="Arkadan (8)">Arka</button><button data-v="left" title="Soldan (4)">Sol</button><button data-v="right" title="Sağdan (5)">Sağ</button></span>
       <span class="grp"><button id="fit" title="Sığdır (F) · boşluğa çift tık da sığdırır">Sığdır</button><button id="zin" title="Yakınlaştır (+)" aria-label="Yakınlaştır">＋</button><button id="zout" title="Uzaklaştır (−)" aria-label="Uzaklaştır">−</button><button id="projbtn" title="Ortografik (ölçekli, perspektifsiz) görünüş — Üst/Alt/Ön/Arka/Sol/Sağ'da kendiliğinden açılır (O)">Orto</button></span>
-      <span class="grp"><button id="secbtn" title="Kesit düzlemi (K)">Kesit</button><button id="expbtn" title="Açılım: parçaları ayır (A)">Açılım</button><button id="measbtn" title="İki nokta arası ölçü (M)">Ölçü</button><button id="dimbtn" class="on" title="Gabari ölçü çizgileri (G)">Gabari</button><button id="holebtn" class="on" title="Seçili parçanın delik ve slotları: Ø, en yakın uca ve kenara mesafe; tablo bilgi panelinde (D)">Delikler</button></span>
+      <span class="grp"><button id="secbtn" title="Kesit düzlemi (K)">Kesit</button><button id="expbtn" title="Açılım: parçaları ayır (A)">Açılım</button><button id="measbtn" title="İki nokta arası ölçü (M)">Ölçü</button><button id="dimbtn" class="on" title="Gabari ölçü çizgileri (G)">Gabari</button><button id="holebtn" class="on" title="Delik ve slotlar: Ø, en yakın uca ve kenara mesafe (az delikte hep, kalabalıkta parçaya tıklayınca); tablo bilgi panelinde (D)">Delikler</button></span>
       <span class="grp"><button id="xray" title="Şeffaf (X)">Şeffaf</button><button id="edges" class="on" title="Kenar çizgileri (E)">Kenarlar</button><button id="zup" class="on" title="Model Z ekseni yukarı (Rhino, AutoCAD, çoğu CAD). Kapatınca Y yukarı olur.">Z yukarı</button></span>
       <span class="grp" id="laygrp" hidden><small>Yerleşim</small><button id="lay-yan" class="on" title="Dosyaları masaya dizer gibi yan yana koy">Yan yana</button><button id="lay-konum" title="Dosyaları modeldeki gerçek konumlarında göster">Konumunda</button><button id="namebtn" class="on" title="Dosya adlarını göster (N)">Adlar</button></span>
       <span class="grp"><a id="ylink" class="bb" href="#" target="_blank" rel="noopener" hidden>Yandex'te aç</a><button id="copybtn" type="button" hidden title="Bu görünümün bağlantısını kopyala">Bağlantıyı kopyala</button><button id="pdfbtn" type="button" hidden title="Açık dosya(lar) için A3 ölçülü görünüş + parça listesi PDF'i (OKY anteti). Bu tarayıcıda hazırlanır ve bilgisayarınıza iner.">PDF indir</button></span>
@@ -841,18 +841,22 @@ function holeOutline(h, at) {   // delik çemberi / slot konturu (model koordina
 }
 function drawHoles() {
   clearHoles();
-  if (!showHoles || !selKey || selKey.startsWith('f|') || !root) return;
-  const ps = parts.filter(p => selected(p) && p.obj.visible);
-  let nd = 0, nl = 0;
-  ps.forEach((p, pi) => {
-    const hs = holesOf(p); if (!hs.length) return;
+  if (!showHoles || !root) return;
+  // parça seçiliyse o parça; değilse (ya da dosya seçiliyse) görünen tüm gövdeler. Az delikte (≤16) mesafeler de çizilir.
+  const partSel = !!selKey && !selKey.startsWith('f|');
+  if (!partSel && parts.reduce((s2, q) => s2 + q.geo.index.count, 0) / 3 > 1.5e6) return;   // çok büyük modelde yalnız seçimle
+  const all = parts.filter(q => q.obj.visible && (!selKey || selected(q)) && q.faces && q.faces.length).map(q => [q, holesOf(q)]).filter(e => e[1].length);
+  const total = all.reduce((s2, e) => s2 + e[1].length, 0), dimsOk = partSel || total <= 16;
+  let nd = 0, nl = 0, nr = 0;
+  all.forEach(([p, hs], pi) => {
     p.obj.updateMatrixWorld(true);
     const M = p.obj.matrixWorld, W = a => new THREE.Vector3(a[0], a[1], a[2]).applyMatrix4(M), fr = partStats(p).frame;
+    const first = !partSel || pi === 0;   // seçili adın diğer kopyalarında yalnız halka
     for (const h of hs) {
-      for (const at of [h.e0, h.e1]) { const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(holeOutline(h, at).map(W)), holeMat); l.renderOrder = 996; holeGroup.add(l); }
-      if (pi > 0) continue;
+      if (nr < 600) { for (const at of [h.e0, h.e1]) { const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(holeOutline(h, at).map(W)), holeMat); l.renderOrder = 996; holeGroup.add(l); } nr += 2; }
+      if (!first) continue;
       if (nl++ < 80) { const el = document.createElement('div'); el.className = 'mlabel hole'; el.textContent = holeTxt(h); labelsEl.append(el); holeLabels.push({ el, p: W(vadd(h.e1, h.tip === 'Slot' ? h.dir : vnorm(vcross(h.ax, Math.abs(h.ax[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0])), h.tip === 'Slot' ? h.L / 2 : h.d / 2)) }); }
-      if (nd++ >= 16) continue;   // kalabalıkta yalnız ilk 16 deliğin mesafe çizgisi; hepsi bilgi tablosunda
+      if (!dimsOk || nd++ >= 16) continue;   // kalabalıkta yalnız ilk 16 deliğin mesafe çizgisi; hepsi bilgi tablosunda
       for (const [ai, dd] of [[h.ip[0], h.uc], [h.ip[1], h.ke]]) {   // en yakın uca ve en yakın kenara
         const a = fr.ax[ai], toMin = dd[0] <= dd[1], dist = toMin ? dd[0] : dd[1];
         if (dist < 0.05) continue;
