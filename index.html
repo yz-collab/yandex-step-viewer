@@ -122,6 +122,9 @@
   .mlabel{position:absolute;transform:translate(-50%,-115%);background:var(--panel);color:var(--ink);border:1.5px solid var(--acc);border-radius:6px;padding:2px 7px;font:12px/1.3 Consolas,"Cascadia Mono",monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
   .mlabel small{display:block;color:var(--mute);font-size:10px}
   .mlabel.dim{border-color:var(--dim);color:var(--dim);transform:translate(-50%,-50%);padding:1px 6px;font-weight:600}
+  .mlabel.hole{border-color:var(--ok);color:var(--ok);transform:translate(-10%,-130%);padding:1px 5px;font-size:11px;font-weight:600}
+  #info .htab{margin-top:7px}
+  #info .htab table{width:100%}
   .mlabel.fname{border-color:var(--line);color:var(--ink);font:600 11.5px/1.3 "Segoe UI",system-ui,sans-serif;transform:translate(-50%,-120%);padding:1px 6px}
   .mlabel.fname.left{transform:translate(calc(-100% - 8px),-50%)}
   canvas.meas{cursor:crosshair}
@@ -168,7 +171,7 @@
       <span id="title">—</span>
       <span class="grp"><button data-v="iso" class="on" title="İzometrik (0)">İzo</button><button data-v="top" title="Üstten (1)">Üst</button><button data-v="bottom" title="Alttan (2)">Alt</button><button data-v="front" title="Önden (3)">Ön</button><button data-v="back" title="Arkadan (8)">Arka</button><button data-v="left" title="Soldan (4)">Sol</button><button data-v="right" title="Sağdan (5)">Sağ</button></span>
       <span class="grp"><button id="fit" title="Sığdır (F) · boşluğa çift tık da sığdırır">Sığdır</button><button id="zin" title="Yakınlaştır (+)" aria-label="Yakınlaştır">＋</button><button id="zout" title="Uzaklaştır (−)" aria-label="Uzaklaştır">−</button><button id="projbtn" title="Ortografik (ölçekli, perspektifsiz) görünüş — Üst/Alt/Ön/Arka/Sol/Sağ'da kendiliğinden açılır (O)">Orto</button></span>
-      <span class="grp"><button id="secbtn" title="Kesit düzlemi (K)">Kesit</button><button id="expbtn" title="Açılım: parçaları ayır (A)">Açılım</button><button id="measbtn" title="İki nokta arası ölçü (M)">Ölçü</button><button id="dimbtn" class="on" title="Gabari ölçü çizgileri (G)">Gabari</button></span>
+      <span class="grp"><button id="secbtn" title="Kesit düzlemi (K)">Kesit</button><button id="expbtn" title="Açılım: parçaları ayır (A)">Açılım</button><button id="measbtn" title="İki nokta arası ölçü (M)">Ölçü</button><button id="dimbtn" class="on" title="Gabari ölçü çizgileri (G)">Gabari</button><button id="holebtn" class="on" title="Seçili parçanın delik ve slotları: Ø, en yakın uca ve kenara mesafe; tablo bilgi panelinde (D)">Delikler</button></span>
       <span class="grp"><button id="xray" title="Şeffaf (X)">Şeffaf</button><button id="edges" class="on" title="Kenar çizgileri (E)">Kenarlar</button><button id="zup" class="on" title="Model Z ekseni yukarı (Rhino, AutoCAD, çoğu CAD). Kapatınca Y yukarı olur.">Z yukarı</button></span>
       <span class="grp" id="laygrp" hidden><small>Yerleşim</small><button id="lay-yan" class="on" title="Dosyaları masaya dizer gibi yan yana koy">Yan yana</button><button id="lay-konum" title="Dosyaları modeldeki gerçek konumlarında göster">Konumunda</button><button id="namebtn" class="on" title="Dosya adlarını göster (N)">Adlar</button></span>
       <span class="grp"><a id="ylink" class="bb" href="#" target="_blank" rel="noopener" hidden>Yandex'te aç</a><button id="copybtn" type="button" hidden title="Bu görünümün bağlantısını kopyala">Bağlantıyı kopyala</button><button id="pdfbtn" type="button" hidden title="Açık dosya(lar) için A3 ölçülü görünüş + parça listesi PDF'i (OKY anteti). Bu tarayıcıda hazırlanır ve bilgisayarınıza iner.">PDF indir</button></span>
@@ -252,7 +255,11 @@ async function api(sub, params) {
   const u = new URL(API + sub);
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null) u.searchParams.set(k, v);
   let r;
-  try { r = await fetch(u.href, { credentials: 'omit', referrerPolicy: 'no-referrer' }); } catch (e) { throw new YErr('net'); }
+  for (let k = 0; ; k++) {   // geçici sunucu hatasında bir kez daha dene
+    try { r = await fetch(u.href, { credentials: 'omit', referrerPolicy: 'no-referrer' }); } catch (e) { throw new YErr('net'); }
+    if (r.status >= 500 && k < 1) { await new Promise(res => setTimeout(res, 700)); continue; }
+    break;
+  }
   if (!r.ok) { let j = {}; try { j = await r.json(); } catch (e) { /* gövde yok */ } throw new YErr('api', r.status, j.description || j.message || ''); }
   return r.json();
 }
@@ -269,11 +276,15 @@ async function listDir(pk, path) {
   return { meta, items };
 }
 async function download(pk, path, sizeHint, onProg) {
-  const { href } = await api('/download', { public_key: pk, path: pathParam(path) });
   let r;
-  // Yandex indirme sunucusu başka siteden gelen Referer'ı 403 ile reddediyor (CORS başlığı da yok) -> Referer gönderme
-  try { r = await fetch(href, { credentials: 'omit', referrerPolicy: 'no-referrer' }); } catch (e) { throw new YErr('net'); }
-  if (!r.ok) throw new YErr('dl', r.status);
+  for (let k = 0; ; k++) {   // Yandex arada geçici 500 veriyor: yeni indirme bağlantısıyla 3 kez dene
+    const { href } = await api('/download', { public_key: pk, path: pathParam(path) });
+    // Yandex indirme sunucusu başka siteden gelen Referer'ı 403 ile reddediyor (CORS başlığı da yok) -> Referer gönderme
+    try { r = await fetch(href, { credentials: 'omit', referrerPolicy: 'no-referrer' }); } catch (e) { if (k < 2) { await new Promise(res => setTimeout(res, 800 * (k + 1))); continue; } throw new YErr('net'); }
+    if (r.ok) break;
+    if (r.status >= 500 && k < 2) { await new Promise(res => setTimeout(res, 800 * (k + 1))); continue; }
+    throw new YErr('dl', r.status);
+  }
   const total = +r.headers.get('content-length') || sizeHint || 0;
   if (!r.body || !r.body.getReader) return new Uint8Array(await r.arrayBuffer());
   const rd = r.body.getReader(), chunks = []; let got = 0;
@@ -318,8 +329,10 @@ function occtJobCore(occt, buf, ext, params) {
       const f0 = m.brep_faces[0].color;
       if (m.brep_faces.every(f => f.color && f.color[0] === f0[0] && f.color[1] === f0[1] && f.color[2] === f0[2])) col = f0;
     }
-    out.push({ name: m.name || '', owner: owner[i], color: col, P, N, I });
-    tr.push(P.buffer, I.buffer); if (N) tr.push(N.buffer);
+    const bf = m.brep_faces || [], FR = new Uint32Array(bf.length * 2);   // STEP yüzü başına üçgen aralığı (delik tespiti)
+    bf.forEach((q, k) => { FR[2 * k] = q.first; FR[2 * k + 1] = q.last; });
+    out.push({ name: m.name || '', owner: owner[i], color: col, P, N, I, FR });
+    tr.push(P.buffer, I.buffer, FR.buffer); if (N) tr.push(N.buffer);
   });
   return { res: { meshes: out, center: c, size: [0, 1, 2].map(a => mx[a] - mn[a]) }, tr };
 }
@@ -421,7 +434,7 @@ function buildScene(keepView) {
       const mat = new THREE.MeshStandardMaterial({ color: col, metalness: 0.25, roughness: 0.6, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
       const mesh = new THREE.Mesh(geo, mat);
       const nm = m.name || (m.owner ? (n > 1 ? `${m.owner} · gövde ${mi + 1}` : m.owner) : `Gövde ${mi + 1}`);
-      const p = { id: pid, obj: mesh, name: nm, key: m.name ? fi + '|' + m.name : 'u' + pid, fi, file: f.name, mat, base: col, geo, named: !!m.name, owner: m.owner };
+      const p = { id: pid, obj: mesh, name: nm, key: m.name ? fi + '|' + m.name : 'u' + pid, fi, file: f.name, mat, base: col, geo, named: !!m.name, owner: m.owner, faces: m.FR };
       pid++;
       mesh.userData.part = p;
       const e = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), edgeMat);
@@ -497,7 +510,8 @@ function eig3(m) {   // simetrik 3x3 (Jacobi) -> özvektörler
       for (let k = 0; k < 3; k++) { const a = V[k][p], b = V[k][q]; V[k][p] = c * a - sn * b; V[k][q] = sn * a + c * b; }
     }
   }
-  return [0, 1, 2].map(j => [V[0][j], V[1][j], V[2][j]]);
+  const vec = [0, 1, 2].map(j => [V[0][j], V[1][j], V[2][j]]); vec.val = [A[0][0], A[1][1], A[2][2]];
+  return vec;
 }
 function extents(P, ax) {
   const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
@@ -539,10 +553,14 @@ function partStats(p) {
     n2.normalize(); const n3 = new THREE.Vector3().crossVectors(n1, n2);
     cands.push([n1.toArray(), n2.toArray(), n3.toArray()]);
   }
-  let best = null, bv = Infinity;
-  for (const ax of cands) { const d = extents(P, ax), v = (d[0] + 1) * (d[1] + 1) * (d[2] + 1); if (v < bv - 1e-6) { bv = v; best = d; } }
+  let best = null, bv = Infinity, bax = cands[0];
+  for (const ax of cands) { const d = extents(P, ax), v = (d[0] + 1) * (d[1] + 1) * (d[2] + 1); if (v < bv - 1e-6) { bv = v; best = d; bax = ax; } }
   const bb = p.geo.boundingBox, s = bb.getSize(new THREE.Vector3());
   p.stats = { obb: best.slice().sort((a, b) => b - a), aabb: [s.x, s.y, s.z], vol: Math.abs(vol), area };
+  const flo = [], fhi = [];   // kendi çerçevesi (boy, en, yük. sırasıyla): delik konumları buna göre
+  for (const a of bax) { let mn = Infinity, mx2 = -Infinity; for (let i = 0; i < P.length; i += 3) { const q = P[i] * a[0] + P[i + 1] * a[1] + P[i + 2] * a[2]; if (q < mn) mn = q; if (q > mx2) mx2 = q; } flo.push(mn); fhi.push(mx2); }
+  const ord = [0, 1, 2].sort((x, y) => (fhi[y] - flo[y]) - (fhi[x] - flo[x]));
+  p.stats.frame = { ax: ord.map(i => vnorm(bax[i])), lo: ord.map(i => flo[i]), hi: ord.map(i => fhi[i]) };
   return p.stats;
 }
 function computeStatsAll() {
@@ -564,6 +582,148 @@ function regroup() {
     p.name = arr.length > 1 ? `${base} · tip ${arr.indexOf(p.key) + 1}` : base;
   }
 }
+// ---------- delik / slot tespiti (görüntüleyici ve PDF aynı veriyi kullanır) ----------
+// STEP her yüzü ayrı üçgen grubu olarak verir: normalleri tek eksene dik + köşeleri çember üstünde + içbükey yüz = delik.
+// Tam çember (≥330°) = delik; iki yarım silindir (≈180°, karşılıklı) = slot. Konum: parçanın kendi kutusunda,
+// delik merkezinden boyuna iki uca (uçlara) ve enine iki kenara (kenarlara) mesafe.
+function holeCylinders(p) {
+  const FR = p.faces, P = p.geo.attributes.position.array, I = p.geo.index.array, cyl = [];
+  for (let f = 0; f < FR.length; f += 2) {
+    const t0 = FR[f], t1 = FR[f + 1];
+    if (t1 - t0 < 3 || 3 * t1 + 2 >= I.length) continue;
+    const cv = [0, 0, 0, 0, 0, 0], vs = new Set(), tn = []; let nt = 0;
+    for (let t = t0; t <= t1; t++) {
+      const a = I[3 * t] * 3, b = I[3 * t + 1] * 3, c = I[3 * t + 2] * 3;
+      const ux = P[b] - P[a], uy = P[b + 1] - P[a + 1], uz = P[b + 2] - P[a + 2], wx = P[c] - P[a], wy = P[c + 1] - P[a + 1], wz = P[c + 2] - P[a + 2];
+      let nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx; const L = Math.hypot(nx, ny, nz); if (!L) continue;
+      nx /= L; ny /= L; nz /= L; nt++;
+      cv[0] += nx * nx; cv[1] += nx * ny; cv[2] += nx * nz; cv[3] += ny * ny; cv[4] += ny * nz; cv[5] += nz * nz;
+      if (tn.length < 48) tn.push([nx, ny, nz, (P[a] + P[b] + P[c]) / 3, (P[a + 1] + P[b + 1] + P[c + 1]) / 3, (P[a + 2] + P[b + 2] + P[c + 2]) / 3]);
+      vs.add(I[3 * t]); vs.add(I[3 * t + 1]); vs.add(I[3 * t + 2]);
+    }
+    if (nt < 4) continue;
+    const E = eig3(cv.map(v => v / nt)), o = [0, 1, 2].sort((x, y) => E.val[x] - E.val[y]);
+    if (E.val[o[0]] > 1e-4 || E.val[o[1]] < 0.02) continue;   // normaller tek eksene dik değil ya da düz yüz
+    const ax = vnorm(E[o[0]]), u = vnorm(E[o[1]]), w = vcross(ax, u);
+    const vi = [...vs], O = [P[3 * vi[0]], P[3 * vi[0] + 1], P[3 * vi[0] + 2]];   // bina koordinatı büyük: yerel kaydır
+    let Sx = 0, Sy = 0, Sxx = 0, Syy = 0, Sxy = 0, Sxz = 0, Syz = 0, Sz = 0; const pts = [];
+    for (const i of vi) {
+      const X = P[3 * i] - O[0], Y = P[3 * i + 1] - O[1], Z = P[3 * i + 2] - O[2];
+      const x = X * u[0] + Y * u[1] + Z * u[2], y = X * w[0] + Y * w[1] + Z * w[2], h = X * ax[0] + Y * ax[1] + Z * ax[2], z = x * x + y * y;
+      pts.push(x, y, h); Sx += x; Sy += y; Sxx += x * x; Syy += y * y; Sxy += x * y; Sxz += x * z; Syz += y * z; Sz += z;
+    }
+    const n = vi.length, M = [[Sxx, Sxy, Sx], [Sxy, Syy, Sy], [Sx, Sy, n]], Bv = [Sxz, Syz, Sz];
+    const det = A => A[0][0] * (A[1][1] * A[2][2] - A[1][2] * A[2][1]) - A[0][1] * (A[1][0] * A[2][2] - A[1][2] * A[2][0]) + A[0][2] * (A[1][0] * A[2][1] - A[1][1] * A[2][0]);
+    const D = det(M); if (!D) continue;
+    const sol = k => det(M.map((r, i) => r.map((x, j) => j === k ? Bv[i] : x))) / D;
+    const cx = sol(0) / 2, cy = sol(1) / 2, R = Math.sqrt(Math.max(0, sol(2) + cx * cx + cy * cy));
+    let res = 0, h0 = Infinity, h1 = -Infinity; const dirs = [];
+    for (let k = 0; k < pts.length; k += 3) {
+      const dx = pts[k] - cx, dy = pts[k + 1] - cy, rr = Math.hypot(dx, dy);
+      res = Math.max(res, Math.abs(rr - R)); h0 = Math.min(h0, pts[k + 2]); h1 = Math.max(h1, pts[k + 2]);
+      if (rr && dirs.length < 600) dirs.push(vadd([u[0] * dx / rr, u[1] * dx / rr, u[2] * dx / rr], w, dy / rr));
+    }
+    if (!(R > 0.05) || R > 1500 || res > Math.max(0.02, R * 0.01)) continue;
+    const C = [O[0] + u[0] * cx + w[0] * cy, O[1] + u[1] * cx + w[1] * cy, O[2] + u[2] * cx + w[2] * cy];   // eksen noktası (h = 0)
+    let inw = 0;
+    for (const q of tn) { const d = [C[0] - q[3], C[1] - q[4], C[2] - q[5]]; inw += vdot(q, vadd(d, ax, -vdot(d, ax))) > 0 ? 1 : -1; }
+    if (inw <= 0) continue;   // dış silindir (pim, boru dışı, büküm dışı) delik değil
+    cyl.push({ R, ax, C, h0, h1, dirs, tr: [[t0, t1]] });
+  }
+  return cyl;
+}
+function arcCover(dirs, ax) {   // kaç derece kaplıyor (10° kovalar) + yayın ortası
+  if (!dirs.length) return { deg: 0, mid: [0, 0, 0] };
+  const u = dirs[0], w = vcross(ax, u), bk = new Uint8Array(36); let m = [0, 0, 0];
+  for (const d of dirs) { const a = Math.atan2(vdot(d, w), vdot(d, u)); bk[((Math.floor((a + Math.PI) / (Math.PI / 18)) % 36) + 36) % 36] = 1; m = vadd(m, d); }
+  return { deg: bk.reduce((s, v) => s + v, 0) * 10, mid: vnorm(m) };
+}
+function rayExit(P, I, mask, o, d) {   // o + t·d ışınının maskesiz ilk üçgen kesişimi (Möller–Trumbore)
+  let best = Infinity;
+  for (let t = 0, n = I.length / 3; t < n; t++) {
+    if (mask[t]) continue;
+    const a = I[3 * t] * 3, b = I[3 * t + 1] * 3, c = I[3 * t + 2] * 3;
+    const e1x = P[b] - P[a], e1y = P[b + 1] - P[a + 1], e1z = P[b + 2] - P[a + 2], e2x = P[c] - P[a], e2y = P[c + 1] - P[a + 1], e2z = P[c + 2] - P[a + 2];
+    const px = d[1] * e2z - d[2] * e2y, py = d[2] * e2x - d[0] * e2z, pz = d[0] * e2y - d[1] * e2x, det = e1x * px + e1y * py + e1z * pz;
+    if (Math.abs(det) < 1e-12) continue;
+    const inv = 1 / det, tx = o[0] - P[a], ty = o[1] - P[a + 1], tz = o[2] - P[a + 2], u = (tx * px + ty * py + tz * pz) * inv;
+    if (u < -1e-7 || u > 1 + 1e-7) continue;
+    const qx = ty * e1z - tz * e1y, qy = tz * e1x - tx * e1z, qz = tx * e1y - ty * e1x, v = (d[0] * qx + d[1] * qy + d[2] * qz) * inv;
+    if (v < -1e-7 || u + v > 1 + 1e-7) continue;
+    const tt = (e2x * qx + e2y * qy + e2z * qz) * inv;
+    if (tt > 1e-4 && tt < best) best = tt;
+  }
+  return best;
+}
+function holesOf(p) {
+  if (p.holes) return p.holes;
+  const out = [];
+  if (!p.faces || !p.faces.length) return (p.holes = out);
+  const raw = holeCylinders(p), used = new Array(raw.length).fill(false), cyl = [];
+  // aynı eksenli, aynı çaplı parçalı silindirleri birleştir (bazı CAD'ler deliği iki yarım yüz yazar)
+  for (let i = 0; i < raw.length; i++) {
+    if (used[i]) continue; used[i] = true;
+    const a = { ...raw[i], dirs: raw[i].dirs.slice(), tr: raw[i].tr.slice() };
+    for (let j = i + 1; j < raw.length; j++) {
+      if (used[j]) continue; const b = raw[j], cs = vdot(a.ax, b.ax);
+      if (Math.abs(Math.abs(cs) - 1) > 1e-3 || Math.abs(a.R - b.R) > 0.02) continue;
+      const d = [b.C[0] - a.C[0], b.C[1] - a.C[1], b.C[2] - a.C[2]], al = vdot(d, a.ax);
+      if (Math.hypot(...vadd(d, a.ax, -al)) > 0.02) continue;
+      const bh0 = al + (cs > 0 ? b.h0 : -b.h1), bh1 = al + (cs > 0 ? b.h1 : -b.h0);
+      if (bh0 > a.h1 + 0.05 || bh1 < a.h0 - 0.05) continue;
+      a.h0 = Math.min(a.h0, bh0); a.h1 = Math.max(a.h1, bh1); a.dirs.push(...b.dirs); a.tr = a.tr.concat(b.tr); used[j] = true;
+    }
+    Object.assign(a, arcCover(a.dirs, a.ax)); cyl.push(a);
+  }
+  const st = partStats(p), fr = st.frame;
+  const feat = (tip, C, ax, h0, h1, d, L, dir, tr) => {
+    const c = vadd(C, ax, (h0 + h1) / 2), ks = fr.ax.map(a => Math.abs(vdot(ax, a))), k = ks.indexOf(Math.max(...ks)), ip = [0, 1, 2].filter(x => x !== k);
+    const depth = h1 - h0;
+    if (k === 0 && depth >= 0.95 * (fr.hi[0] - fr.lo[0])) return null;   // boru iç çapı: delik değil
+    const q = ip.map(i => vdot(c, fr.ax[i]));
+    return { tip, d, L, dir, ax, c, tr, e0: vadd(C, ax, h0), e1: vadd(C, ax, h1), depth, k, ip,
+      uc: [q[0] - fr.lo[ip[0]], fr.hi[ip[0]] - q[0]], ke: [q[1] - fr.lo[ip[1]], fr.hi[ip[1]] - q[1]] };
+  };
+  const halves = [];
+  for (const c of cyl) {
+    if (c.deg >= 330) { const f = feat('Delik', c.C, c.ax, c.h0, c.h1, 2 * c.R, undefined, undefined, c.tr); if (f) out.push(f); }
+    else if (c.deg >= 150 && c.deg <= 220) halves.push(c);
+  }
+  const hu = new Array(halves.length).fill(false);   // iki yarım silindir, yayları dışa bakıyorsa = slot
+  for (let i = 0; i < halves.length; i++) {
+    if (hu[i]) continue;
+    for (let j = i + 1; j < halves.length; j++) {
+      if (hu[j]) continue; const a = halves[i], b = halves[j], cs = vdot(a.ax, b.ax);
+      if (Math.abs(Math.abs(cs) - 1) > 1e-3 || Math.abs(a.R - b.R) > 0.02) continue;
+      const d0 = [b.C[0] - a.C[0], b.C[1] - a.C[1], b.C[2] - a.C[2]], al = vdot(d0, a.ax), dv = vadd(d0, a.ax, -al), dist = Math.hypot(...dv);
+      if (dist < 0.05) continue;
+      const bh0 = al + (cs > 0 ? b.h0 : -b.h1), bh1 = al + (cs > 0 ? b.h1 : -b.h0);
+      if (bh0 > a.h1 + 0.05 || bh1 < a.h0 - 0.05 || vdot(a.mid, dv) > 0 || vdot(b.mid, dv) < 0) continue;
+      const dir = vnorm(dv), C = vadd(a.C, dv, 0.5);
+      const f = feat('Slot', C, a.ax, Math.min(a.h0, bh0), Math.max(a.h1, bh1), 2 * a.R, dist + 2 * a.R, dir, a.tr.concat(b.tr));
+      if (f) out.push(f); hu[i] = hu[j] = true; break;
+    }
+  }
+  // gerçek kenar mesafesi: merkezden (orta derinlik) dört yöne ışın; delik duvarları atlanır, malzemenin bittiği ilk yüzey = kenar
+  // (L plaka kolunda iç kenar, profilde uç). Bulunamazsa parçanın kendi kutusu kalır.
+  if (out.length) {
+    const P = p.geo.attributes.position.array, I = p.geo.index.array, mask = new Uint8Array(I.length / 3);
+    for (const f of out) for (const [t0, t1] of f.tr) mask.fill(1, t0, t1 + 1);
+    for (const f of out) for (const [arr, ai] of [[f.uc, f.ip[0]], [f.ke, f.ip[1]]]) {
+      const a = fr.ax[ai], dn = rayExit(P, I, mask, f.c, vneg(a)), dp = rayExit(P, I, mask, f.c, a);
+      if (isFinite(dn)) arr[0] = dn; if (isFinite(dp)) arr[1] = dp;
+    }
+  }
+  out.sort((a, b) => a.uc[0] - b.uc[0] || a.ke[0] - b.ke[0]);
+  return (p.holes = out);
+}
+const holeTxt = h => h.tip === 'Slot' ? `Slot ${fmtDim(h.d)}×${fmtDim(h.L)}` : `Ø${fmt(h.d, 2)}`;
+const holeKey = h => h.tip === 'Slot' ? `S${h.d.toFixed(2)}x${h.L.toFixed(2)}` : `D${h.d.toFixed(2)}`;
+function holeLegend(hs) {   // "4×Ø5 · 2×Slot 10×30"
+  const g = new Map(); for (const h of hs) { const k = holeKey(h), e = g.get(k) || { n: 0, h }; e.n++; g.set(k, e); }
+  return [...g.values()].sort((a, b) => a.h.d - b.h.d).map(e => `${e.n}×${holeTxt(e.h)}`).join(' · ');
+}
+const pair = v => `${fmtDim(v[0])} / ${fmtDim(v[1])}`;
 const lenOf = p => p.stats ? p.stats.obb[0] : Math.max(...p.geo.boundingBox.getSize(new THREE.Vector3()).toArray());
 
 // ---------- parça tablosu ----------
@@ -601,7 +761,7 @@ function applyVis() {
   }
   partsBody.querySelectorAll('.r[data-k]').forEach(r => r.classList.toggle('on', r.dataset.k === selKey));
   partsBody.querySelectorAll('.fh').forEach(r => r.classList.toggle('on', 'f|' + r.dataset.f === selKey));
-  drawDims();
+  drawDims(); drawHoles();
 }
 const dimsXYZ = s => (zUp ? [s.x, s.z, s.y] : [s.x, s.y, s.z]);
 function select(k) {
@@ -626,7 +786,7 @@ function select(k) {
       <tr><th>Hacim</th><td>${fmt(st.vol / 1000, 1)} cm³</td></tr>
       <tr><th>Ağırlık ≈</th><td>alü (2,70) ${fmt(st.vol * 2.7e-6, 2)} kg · çelik (7,85) ${fmt(st.vol * 7.85e-6, 2)} kg</td></tr>
       <tr><th>Yüzey alanı</th><td>${fmt(st.area / 1e6, 3)} m²</td></tr>
-      ${ps.length > 1 ? `<tr><th>Bu adla</th><td>${ps.length} adet</td></tr>` : ''}</table>`;
+      ${ps.length > 1 ? `<tr><th>Bu adla</th><td>${ps.length} adet</td></tr>` : ''}</table>` + holeTableHtml(p);
   }
   h += `<div class="ibtn"><button id="isobtn" class="${isoKey ? 'on' : ''}">${isoKey ? 'Hepsini göster' : 'Yalnız bunu göster'}</button><button id="selzoom">Yakınlaş</button></div>
     <small>Hacim ve ağırlık, model kapalı katıysa doğrudur.</small>`;
@@ -662,6 +822,53 @@ function drawDims() {
   ext(new THREE.Vector3(min.x, max.y, max.z), new THREE.Vector3(min.x - o - e, max.y, max.z));
   dimLine(new THREE.Vector3(min.x - o, min.y - o, min.z), new THREE.Vector3(min.x - o, min.y - o, max.z), fmt(s.z) + ' mm');
   ext(new THREE.Vector3(min.x, min.y, min.z), new THREE.Vector3(min.x - o - e, min.y - o - e, min.z));
+}
+
+// ---------- delik işaretleri ve mesafe çizgileri (seçili parça) ----------
+const holeGroup = new THREE.Group(); scene.add(holeGroup);
+const holeMat = new THREE.LineBasicMaterial({ color: 0x2e8540, depthTest: false });
+const holeLabels = [];
+let showHoles = true;
+function clearHoles() { while (holeGroup.children.length) { const c = holeGroup.children[0]; c.geometry.dispose(); holeGroup.remove(c); } holeLabels.forEach(l => l.el.remove()); holeLabels.length = 0; }
+function holeOutline(h, at) {   // delik çemberi / slot konturu (model koordinatı)
+  const ax = h.ax, a = h.tip === 'Slot' ? h.dir : vnorm(Math.abs(ax[0]) < 0.9 ? vcross(ax, [1, 0, 0]) : vcross(ax, [0, 1, 0])), b = vcross(ax, a), r = h.d / 2, pts = [];
+  const P = (x, y) => vadd(vadd(at, a, x), b, y);
+  if (h.tip !== 'Slot') { for (let i = 0; i <= 40; i++) { const t = i / 40 * 2 * Math.PI; pts.push(P(Math.cos(t) * r, Math.sin(t) * r)); } return pts; }
+  const hl = (h.L - h.d) / 2;
+  for (let i = 0; i <= 20; i++) { const t = -Math.PI / 2 + i / 20 * Math.PI; pts.push(P(hl + Math.cos(t) * r, Math.sin(t) * r)); }
+  for (let i = 0; i <= 20; i++) { const t = Math.PI / 2 + i / 20 * Math.PI; pts.push(P(-hl + Math.cos(t) * r, Math.sin(t) * r)); }
+  pts.push(pts[0]); return pts;
+}
+function drawHoles() {
+  clearHoles();
+  if (!showHoles || !selKey || selKey.startsWith('f|') || !root) return;
+  const ps = parts.filter(p => selected(p) && p.obj.visible);
+  let nd = 0, nl = 0;
+  ps.forEach((p, pi) => {
+    const hs = holesOf(p); if (!hs.length) return;
+    p.obj.updateMatrixWorld(true);
+    const M = p.obj.matrixWorld, W = a => new THREE.Vector3(a[0], a[1], a[2]).applyMatrix4(M), fr = partStats(p).frame;
+    for (const h of hs) {
+      for (const at of [h.e0, h.e1]) { const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(holeOutline(h, at).map(W)), holeMat); l.renderOrder = 996; holeGroup.add(l); }
+      if (pi > 0) continue;
+      if (nl++ < 80) { const el = document.createElement('div'); el.className = 'mlabel hole'; el.textContent = holeTxt(h); labelsEl.append(el); holeLabels.push({ el, p: W(vadd(h.e1, h.tip === 'Slot' ? h.dir : vnorm(vcross(h.ax, Math.abs(h.ax[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0])), h.tip === 'Slot' ? h.L / 2 : h.d / 2)) }); }
+      if (nd++ >= 16) continue;   // kalabalıkta yalnız ilk 16 deliğin mesafe çizgisi; hepsi bilgi tablosunda
+      for (const [ai, dd] of [[h.ip[0], h.uc], [h.ip[1], h.ke]]) {   // en yakın uca ve en yakın kenara
+        const a = fr.ax[ai], toMin = dd[0] <= dd[1], dist = toMin ? dd[0] : dd[1];
+        if (dist < 0.05) continue;
+        const A = W(h.e1), B = W(vadd(h.e1, a, toMin ? -dist : dist));
+        const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([A, B]), dimMat); l.renderOrder = 997; holeGroup.add(l);
+        const el = document.createElement('div'); el.className = 'mlabel dim'; el.textContent = fmtDim(dist); labelsEl.append(el);
+        holeLabels.push({ el, p: A.clone().add(B).multiplyScalar(0.5), a: A, b: B });
+      }
+    }
+  });
+}
+function holeTableHtml(p) {
+  const hs = holesOf(p); if (!hs.length) return '';
+  const rows = hs.slice(0, 120).map((h, i) => `<tr><td>${i + 1}</td><td>${esc(holeTxt(h))}</td><td>${pair(h.uc)}</td><td>${pair(h.ke)}</td><td>${fmtDim(h.depth)}</td></tr>`).join('');
+  return `<div class="htab"><b>Delikler · ${esc(holeLegend(hs))}</b><br><small>Delik merkezinden en yakın malzeme kenarına (mm): uçlara = boyuna iki yön, kenarlara = enine iki yön; aradaki delikler atlanır</small>
+    <table><tr><th>No</th><th>Ölçü</th><th>Uçlara</th><th>Kenarlara</th><th>Derinlik</th></tr>${rows}</table>${hs.length > 120 ? `<small>… ${hs.length - 120} delik daha (PDF delik listesinde hepsi var)</small>` : ''}</div>`;
 }
 
 // ---------- kamera ----------
@@ -756,7 +963,7 @@ function setExplode(f) {
   explode = f; $('#expval').textContent = '%' + Math.round(f * 100); $('#expbtn').classList.toggle('on', f > 0);
   if (!root) return;
   for (const p of parts) p.obj.position.copy(p.obj.parent.worldToLocal(p.homeW.clone().addScaledVector(p.dirW, f * 1.2)));
-  root.updateMatrixWorld(true); box.setFromObject(root); labelTops(); applySection(); drawDims();
+  root.updateMatrixWorld(true); box.setFromObject(root); labelTops(); applySection(); drawDims(); drawHoles();
 }
 
 // ---------- ölçü (iki nokta; ekranda ~14 px içindeki köşeye yakalar) ----------
@@ -800,6 +1007,11 @@ function place(el, p3) {
 }
 function updateLabels() {
   for (const m of measures) place(m.label, m.a.clone().add(m.b).multiplyScalar(0.5));
+  for (const l of holeLabels) {
+    if (l.a) { const w = view.clientWidth, h = view.clientHeight, a = l.a.clone().project(camera), b = l.b.clone().project(camera);
+      if (Math.hypot((a.x - b.x) * w / 2, (a.y - b.y) * h / 2) < 28) { l.el.style.display = 'none'; continue; } }
+    place(l.el, l.p);
+  }
   for (const l of dimLabels) {
     const w = view.clientWidth, h = view.clientHeight, a = l.a.clone().project(camera), b = l.b.clone().project(camera);
     if (Math.hypot((a.x - b.x) * w / 2, (a.y - b.y) * h / 2) < 40) { l.el.style.display = 'none'; continue; }
@@ -1091,7 +1303,7 @@ const SCALES = [10, 5, 2, 1, 1 / 2, 1 / 5, 1 / 10, 1 / 20, 1 / 25, 1 / 50, 1 / 1
 const scaleTxt = s => s >= 1 ? `${fmt(s, 0)}:1` : `1:${fmt(1 / s, 0)}`;
 const fmtDim = v => fmt(v, Math.abs(v - Math.round(v)) < 0.05 ? 0 : 1);
 const DA = { x: 12, y: 10, w: 394, h: 243 }, GAP = 14, DM = 12, LBL = 11, PXP = 0.12;   // kâğıt mm
-const TCOLS = [['POZ', 10, 'c'], ['PARÇA ADI', 58, 'l'], ['ADET', 13, 'c'], ['BOY (mm)', 22, 'r'], ['EN × YÜK. (mm)', 33, 'r'], ['HACİM (cm³)', 20, 'r'], ['AĞIRLIK* (kg)', 20, 'r']];
+const TCOLS = [['POZ', 10, 'c'], ['PARÇA ADI', 56, 'l'], ['ADET', 12, 'c'], ['DELİK', 12, 'c'], ['BOY (mm)', 22, 'r'], ['EN × YÜK. (mm)', 32, 'r'], ['HACİM (cm³)', 20, 'r'], ['AĞIRLIK* (kg)', 20, 'r']];
 const TW = TCOLS.reduce((s, c) => s + c[1], 0), TRH = 5.2, THD = 8;
 
 let pdfLibP = null;
@@ -1235,7 +1447,7 @@ async function renderView(geos, vb, pxModel) {
     }
     return { pu, pv, pd, I: g.I };
   });
-  if (!isFinite(u0)) return { segs: new Float32Array(0), bb: [0, 0, 0, 0] };
+  if (!isFinite(u0)) return { segs: new Float32Array(0), bb: [0, 0, 0, 0], hidden: () => false };
   let px = pxModel, Wd = 0, Hd = 0;
   for (;;) { Wd = Math.ceil((u1 - u0) / px) + 5; Hd = Math.ceil((v1 - v0) / px) + 5; if (Wd * Hd <= 9e6) break; px *= 1.25; }
   const ox = u0 - 2 * px, oy = v1 + 2 * px, buf = new Float32Array(Wd * Hd).fill(-Infinity);
@@ -1290,7 +1502,7 @@ async function renderView(geos, vb, pxModel) {
       if (s1 * s2 < 0) edge(SE[i], SE[i + 1], SE[i + 2], SE[i + 3], SE[i + 4], SE[i + 5]);
     }
   }
-  return { segs: new Float32Array(segs), bb: [u0, v0, u1, v1] };
+  return { segs: new Float32Array(segs), bb: [u0, v0, u1, v1], hidden: (u, v, d) => hidden((u - ox) / px, (oy - v) / px, d) };
 }
 
 // ---------- yerleşim ----------
@@ -1310,31 +1522,36 @@ function placeIn(rects, w, h, mode = 0) {   // en uygun boş dikdörtgene yerle�
   return { x: r.x, y: r.y };
 }
 const perms = a => a.length <= 1 ? [a] : a.flatMap((x, i) => perms([...a.slice(0, i), ...a.slice(i + 1)]).map(r => [x, ...r]));
-function planSheet(F, nRows) {
+function planSheet(F, nRows, hv = {}, nHRows = 0) {
   const { H, V, D } = F, elong = H / Math.max(V, D, 1e-6) > 6;
   const iso = viewBases(F).iso, endLen = Math.min(H, 3 * Math.max(V, D)), corners = [];
   for (const r of [F.er[0], elong ? F.er[0] + endLen : F.er[1]]) for (const u of F.eu) for (const b of F.eb) corners.push(vadd(vadd([F.R[0] * r, F.R[1] * r, F.R[2] * r], F.U, u), F.B, b));
   const iu = corners.map(c => vdot(c, iso.R)), iv = corners.map(c => vdot(c, iso.U));
   const isoW = Math.max(...iu) - Math.min(...iu), isoH = Math.max(...iv) - Math.min(...iv);
-  const th2 = THD + nRows * TRH + 6;
+  const th2 = THD + nRows * TRH + 6, th3 = THD + nHRows * TRH + 6;
+  // delik görünen görünüşlerde ordinat ölçü payı: üstte (dikey yazılar), sağda (yatay yazılar), altta (delik özeti)
+  const mg = k => (hv[k] || 0) ? { t: 14, r: 19, b: 5 } : { t: 0, r: 0, b: 0 };
+  const mf = mg('front'), mt = mg('top'), ml = mg('left');
   let best = null;
   for (const s of SCALES) {
     const fw = H * s, fh = V * s, sw = D * s, th = D * s, g2 = Math.max(GAP, 25 - (fw + sw) / 2);   // adlar çakışmasın
     // A: ÜST, ÖN'ün altında (hizalı) · B: ÜST serbest (yüksek parçalarda büyük ölçek için)
     for (const topFree of [false, true]) {
-      const bw = DM + fw + (elong ? 0 : g2 + sw), bh = DM + fh + LBL + (topFree ? 0 : GAP * 0.4 + th + LBL);
-      if (bw > DA.w || bh > DA.h) continue;
-      const fx = DA.x + DM, fy = DA.y + DM;
+      const fx = DA.x + DM, fy = DA.y + DM + (elong ? mf.t : Math.max(mf.t, ml.t));
+      const frontB = fy + fh + LBL + mf.b;
+      let right = fx + fw + mf.r, bottom = frontB;
       const base = [{ k: 'front', ad: 'ÖN GÖRÜNÜŞ', x: fx, y: fy, s, dims: ['h', 'v'] }];
-      if (!topFree) base.push({ k: 'top', ad: 'ÜST GÖRÜNÜŞ', x: fx, y: fy + fh + LBL + GAP * 0.4, s, dims: ['vl'] });
-      if (!elong) base.push({ k: 'left', ad: 'SOL GÖRÜNÜŞ', x: fx + fw + g2, y: fy, s, dims: [] });
+      if (!elong) { const lx = right + g2; base.push({ k: 'left', ad: 'SOL GÖRÜNÜŞ', x: lx, y: fy, s, dims: [] }); right = lx + sw + ml.r; bottom = Math.max(bottom, fy + fh + LBL + ml.b); }
+      if (!topFree) { const ty = frontB + GAP * 0.4 + mt.t; base.push({ k: 'top', ad: 'ÜST GÖRÜNÜŞ', x: fx, y: ty, s, dims: ['vl'] }); right = Math.max(right, fx + fw + mt.r); bottom = Math.max(bottom, ty + th + LBL + mt.b); }
+      const bw = right - DA.x, bh = bottom - DA.y;
+      if (bw > DA.w || bh > DA.h) continue;
       const rw = DA.w - bw - GAP;   // sağ şerit dar kalırsa alt alan tüm genişliği kullanır
       const rects0 = [{ x: DA.x + bw + GAP, y: DA.y, w: rw, h: DA.h },
         { x: DA.x, y: DA.y + bh + GAP * 0.5, w: rw < 40 ? DA.w : bw, h: DA.y + DA.h - (DA.y + bh + GAP * 0.5) }].filter(r => r.w > 20 && r.h > 20);
-      const kinds = ['iso', ...(topFree ? ['top'] : []), ...(elong ? ['side'] : []), ...(nRows ? ['table'] : [])];
+      const kinds = ['iso', ...(topFree ? ['top'] : []), ...(elong ? ['side'] : []), ...(nRows ? ['table'] : []), ...(nHRows ? ['htable'] : [])];
       let bc = null;   // tüm sıralar ve bölme biçimleri denenir
       for (const order of perms(kinds)) for (let m = 0; m < (1 << kinds.length); m++) {
-        const rects = rects0.map(r => ({ ...r })), o = { views: [], table: null, isz: 0, ssz: elong ? 0 : 30, top: !topFree };
+        const rects = rects0.map(r => ({ ...r })), o = { views: [], table: null, htable: null, isz: 0, ssz: elong ? 0 : 30, top: !topFree };
         order.forEach((k, i) => {
           const mode = (m >> i) & 1;
           if (k === 'iso') {
@@ -1342,21 +1559,22 @@ function planSheet(F, nRows) {
             const p = bs && placeIn(rects, isoW * bs, isoH * bs + LBL, mode);
             if (p) { o.views.push({ k: 'iso', ad: elong ? 'İZOMETRİK – A UCU' : 'İZOMETRİK', x: p.x, y: p.y, s: bs, w: isoW * bs, h: isoH * bs, clip: elong ? endLen : 0, dims: [] }); o.isz = Math.max(isoW, isoH) * bs; }
           } else if (k === 'top') {
-            const p = placeIn(rects, fw + DM, th + LBL, mode);
-            if (p) { o.views.push({ k: 'top', ad: 'ÜST GÖRÜNÜŞ', x: p.x + DM, y: p.y, s, dims: ['vl'] }); o.top = true; }
+            const p = placeIn(rects, DM + fw + mt.r, mt.t + th + LBL + mt.b, mode);
+            if (p) { o.views.push({ k: 'top', ad: 'ÜST GÖRÜNÜŞ', x: p.x + DM, y: p.y + mt.t, s, dims: ['vl'] }); o.top = true; }
           } else if (k === 'side') {   // uzun parça: sol görünüş büyük ölçekte (kesit okunur olsun)
-            let bs = 0; for (const r of rects) { const q = fitS(D, V, r.w - DM, r.h - DM, 10, 90); if (q > bs) bs = q; }
-            const p = bs && placeIn(rects, D * bs + DM, V * bs + DM + LBL, mode);
-            if (p) { o.views.push({ k: 'left', ad: 'SOL GÖRÜNÜŞ', x: p.x + DM, y: p.y + DM, s: bs, dims: ['h', 'v'] }); o.ssz = Math.max(D, V) * bs; }
-          } else { const p = placeIn(rects, TW, th2, mode); if (p) o.table = p; }
+            let bs = 0; for (const r of rects) { const q = fitS(D, V, r.w - DM - ml.r, r.h - DM - ml.t - ml.b, 10, 90); if (q > bs) bs = q; }
+            const p = bs && placeIn(rects, DM + D * bs + ml.r, DM + ml.t + V * bs + LBL + ml.b, mode);
+            if (p) { o.views.push({ k: 'left', ad: 'SOL GÖRÜNÜŞ', x: p.x + DM, y: p.y + DM + ml.t, s: bs, dims: ['h', 'v'] }); o.ssz = Math.max(D, V) * bs; }
+          } else if (k === 'table') { const p = placeIn(rects, TW, th2, mode); if (p) o.table = p; }
+          else { const p = placeIn(rects, HTW, th3, mode); if (p) o.htable = p; }
         });
-        o.score = o.top ? Math.min(o.isz / 55, 1) * 0.6 + Math.min(o.isz / 150, 1) * 0.4 + Math.min(o.ssz / 30, 1) + (o.table ? 0.1 : 0) - (topFree ? 0.05 : 0) : -9;
+        o.score = o.top ? Math.min(o.isz / 55, 1) * 0.6 + Math.min(o.isz / 150, 1) * 0.4 + Math.min(o.ssz / 30, 1) + (o.table ? 0.1 : 0) + (o.htable ? 0.1 : 0) - (topFree ? 0.05 : 0) : -9;
         if (!bc || o.score > bc.score + 1e-9) bc = o;
       }
-      const L = { s, elong, views: [...base, ...bc.views], table: bc.table, score: bc.score + Math.min(Math.max(fw, fh) / 250, 1) * 0.5 };
+      const L = { s, elong, views: [...base, ...bc.views], table: bc.table, htable: bc.htable, score: bc.score + Math.min(Math.max(fw, fh) / 250, 1) * 0.5 };
       if (!best || L.score > best.score + 1e-9) best = L;
     }
-    if (best && best.score >= 2.55) break;
+    if (best && best.score >= 2.55 + (nHRows ? 0.1 : 0)) break;
   }
   return best;
 }
@@ -1424,31 +1642,94 @@ function drawViewSegs(doc, vr, X, Y, s) {
   }
   doc.stroke(); doc.setLineCap(0);
 }
-function drawTable(doc, x, y, rows, title) {
+const TFOOT = '* Ağırlık alüminyum (2,70 g/cm³) varsayımıyla; gövde kapalı katı değilse hacim hatalıdır.';
+const HFOOT = 'Delik merkezinden malzemenin bittiği ilk kenara (aradaki delikler atlanır): uçlara = parçanın boyuna iki yönü, kenarlara = enine iki yönü. Aynı parçadan birden çok varsa delikler bir kez yazılır.';
+function drawTable(doc, x, y, rows, title, COLS = TCOLS, foot = TFOOT) {
+  const TW = COLS.reduce((s2, c) => s2 + c[1], 0);
   pdfText(doc, title, x, y + 4, { h: 3, bold: true });
   let yy = y + 6; doc.setLineWidth(0.25); doc.rect(x, yy, TW, THD); doc.setLineWidth(0.13);
   let cx = x;
-  for (const [ad, w, al] of TCOLS) { pdfText(doc, ad, al === 'l' ? cx + 1.5 : al === 'r' ? cx + w - 1.5 : cx + w / 2, yy + 5.3, { h: 2, bold: true, align: al === 'l' ? 'left' : al === 'r' ? 'right' : 'center', mw: w - 2 }); cx += w; doc.line(cx, yy, cx, yy + THD + rows.length * TRH); }
+  for (const [ad, w, al] of COLS) { pdfText(doc, ad, al === 'l' ? cx + 1.5 : al === 'r' ? cx + w - 1.5 : cx + w / 2, yy + 5.3, { h: 2, bold: true, align: al === 'l' ? 'left' : al === 'r' ? 'right' : 'center', mw: w - 2 }); cx += w; doc.line(cx, yy, cx, yy + THD + rows.length * TRH); }
   doc.line(x, yy, x, yy + THD + rows.length * TRH);
   yy += THD;
   for (const r of rows) {
     cx = x;
-    r.forEach((v, i) => { const [, w, al] = TCOLS[i]; pdfText(doc, v, al === 'l' ? cx + 1.5 : al === 'r' ? cx + w - 1.5 : cx + w / 2, yy + 3.7, { h: 2.1, align: al === 'l' ? 'left' : al === 'r' ? 'right' : 'center', mw: w - 2.5 }); cx += w; });
+    r.forEach((v, i) => { const [, w, al] = COLS[i]; pdfText(doc, v, al === 'l' ? cx + 1.5 : al === 'r' ? cx + w - 1.5 : cx + w / 2, yy + 3.7, { h: 2.1, align: al === 'l' ? 'left' : al === 'r' ? 'right' : 'center', mw: w - 2.5 }); cx += w; });
     yy += TRH; doc.line(x, yy, x + TW, yy);
   }
   doc.setLineWidth(0.25); doc.rect(x, y + 6, TW, THD + rows.length * TRH);
-  pdfText(doc, '* Ağırlık alüminyum (2,70 g/cm³) varsayımıyla; gövde kapalı katı değilse hacim hatalıdır.', x, yy + 4, { h: 1.8 });
+  pdfText(doc, foot, x, yy + 4, { h: 1.8, mw: Math.max(TW, 180) });
+}
+// ---------- PDF: delik listesi ve görünüşlerde ordinat ölçüler ----------
+const HCOLS = [['NO', 10, 'c'], ['POZ', 10, 'c'], ['PARÇA', 52, 'l'], ['DELİK', 28, 'l'], ['UÇLARA (mm)', 30, 'r'], ['KENARLARA (mm)', 30, 'r'], ['DERİNLİK', 18, 'r']];
+const HTW = HCOLS.reduce((s, c) => s + c[1], 0), ORD_MAX = 60;
+function holeRows(fi) {   // aynı parçadan birden çok varsa delikler bir kez yazılır (adet parça listesinde)
+  const rows = [];
+  groupsOf(fi).forEach((e, i) => holesOf(e.p).forEach(h => rows.push([String(rows.length + 1), String(i + 1), e.p.name, holeTxt(h), pair(h.uc), pair(h.ke), fmtDim(h.depth)])));
+  return rows;
+}
+function fileHoles(ps) {   // dosyadaki tüm gövdelerin delikleri (dosya koordinatında)
+  const out = []; for (const p of ps) for (const h of holesOf(p)) out.push(h); return out;
+}
+function viewHoleCount(hs, vb) { let n = 0; for (const h of hs) if (Math.abs(vdot(h.ax, vb.B)) > 0.98) n++; return n; }
+// görünüşte daire olarak görünen delikler: merkez işareti + sol/alt kenardan ordinat ölçü + altta özet
+function drawHoleDims(doc, vr, vb, hs, X, Y, w, h, s, withOrd, topOff = DM + 2) {
+  const [u0, v0, , v1] = vr.bb, PX = u => X + (u - u0) * s, PY = v => Y + (v1 - v) * s;
+  const vis = [];
+  for (const q of hs) {
+    if (Math.abs(vdot(q.ax, vb.B)) <= 0.98) continue;
+    const near = vdot(q.e0, vb.B) > vdot(q.e1, vb.B) ? q.e0 : q.e1, u = vdot(q.c, vb.R), v = vdot(q.c, vb.U);
+    if (vr.hidden(u, v, vdot(near, vb.B))) continue;
+    vis.push({ u, v, h: q });
+  }
+  if (!vis.length) return '';
+  doc.setLineWidth(0.1);
+  for (const q of vis) {   // merkez işareti
+    const cx = PX(q.u), cy = PY(q.v), m = Math.max((q.h.tip === 'Slot' ? q.h.L : q.h.d) / 2 * s + 0.8, 1.2);
+    doc.line(cx - m, cy, cx + m, cy); doc.line(cx, cy - m, cx, cy + m);
+  }
+  let skipped = !withOrd || vis.length > ORD_MAX;
+  if (!skipped) {
+    const yA = Y - topOff, xA = X + w + 6, ch = 2.1;
+    const us = [...new Map(vis.map(q => [Math.round((q.u - u0) * 10), q.u])).values()].sort((a, b) => a - b);
+    const vs0 = new Set(vis.map(q => Math.round((q.v - v0) * 10)));
+    const okU = (us.length + 1) * 2.7 <= w + 30, okV = (vs0.size + 1) * 2.8 <= h + 30;
+    if (!okU || !okV) skipped = true;
+    if (okU) {
+      doc.line(X, Y - 1.5, X, yA); pdfText(doc, '0', X + ch / 2, yA - 0.8, { h: ch, angle: 90 });
+      let last = X;
+      for (const u of us) {
+        const x = PX(u), lx = Math.max(x, last + 2.7);
+        doc.line(x, Y - 1.5, x, yA); if (lx - x > 0.05) doc.line(x, yA, lx, yA - 1.6);
+        pdfText(doc, fmtDim(u - u0), lx + ch / 2, yA - (lx - x > 0.05 ? 2.4 : 0.8), { h: ch, angle: 90 }); last = lx;
+      }
+    }
+    if (okV) {
+      const vs = [...new Map(vis.map(q => [Math.round((q.v - v0) * 10), q.v])).values()].sort((a, b) => b - a);   // yukarıdan aşağı
+      doc.line(X + w + 1.5, Y + h, xA, Y + h); pdfText(doc, '0', xA + 1, Y + h + 0.75, { h: ch });
+      let lastY = -Infinity; const ys = [];
+      for (const v of vs) { const y = PY(v); ys.push([v, y]); }
+      ys.sort((a, b) => a[1] - b[1]);
+      for (const [v, y] of ys) {
+        if (Math.abs(y - (Y + h)) < 0.05) continue;
+        const ly = Math.max(y, lastY + 2.8);
+        doc.line(X + w + 1.5, y, xA, y); if (ly - y > 0.05) doc.line(xA, y, xA + 1.6, ly);
+        pdfText(doc, fmtDim(v - v0), xA + (ly - y > 0.05 ? 2 : 1), ly + 0.75, { h: ch }); lastY = ly;
+      }
+    }
+  }
+  return holeLegend(vis.map(q => q.h)) + (skipped ? ' · konumlar delik listesinde' : '');
 }
 function partRows(fi) {
   return groupsOf(fi).map((e, i) => {
     const st = partStats(e.p), o = st.obb;
-    return [String(i + 1), e.p.name, String(e.n), fmtDim(o[0]), `${fmtDim(o[1])} × ${fmtDim(o[2])}`, fmt(st.vol / 1000 * e.n, 1), fmt(st.vol * 2.7e-6 * e.n, 2)];
+    return [String(i + 1), e.p.name, String(e.n), String(holesOf(e.p).length || '—'), fmtDim(o[0]), `${fmtDim(o[1])} × ${fmtDim(o[2])}`, fmt(st.vol / 1000 * e.n, 1), fmt(st.vol * 2.7e-6 * e.n, 2)];
   });
 }
 function notes(doc, src) {
   const x = 63, y0 = 259;
   pdfText(doc, 'OTOMATİK KONTROL PAFTASI – İMALAT PAFTASI YERİNE KULLANILMAZ', x, y0 + 2, { h: 2.1, bold: true, mw: 66 });
-  ['Ölçüler mm; gabari ölçüleri STEP modelinden alınmıştır.', 'Görünüşler parçanın kendi ekseninde, birinci açı (ISO-E).', 'Gizli çizgiler gösterilmemiştir.', src]
+  ['Ölçüler mm; gabari ölçüleri STEP modelinden alınmıştır.', 'Görünüşler parçanın kendi ekseninde, birinci açı (ISO-E).', 'Gizli çizgiler gösterilmemiştir.', 'Delik ordinatları merkezden, görünüşün sol ve alt kenarından (0).', src]
     .forEach((t, i) => pdfText(doc, `${i + 1}. ${t}`, x, y0 + 6.5 + i * 4, { h: 1.7, mw: 66 }));
 }
 
@@ -1463,13 +1744,14 @@ async function makePdf(onProg = () => {}) {
   const proj = local() ? 'Yerel dosya' : (S.rootName || 'Yandex paylaşımı'), src = local() ? 'Kaynak: yerel dosya' : `Kaynak: ${webUrl(S.pk, S.path)}`;
   // 1) planla (sayfa sayısı için)
   const plans = files.map((f, fi) => {
-    const ps = parts.filter(p => p.fi === fi), F = drawFrame(ps), rows = partRows(fi);
-    const L = planSheet(F, rows.length);
-    const perPage = Math.floor((DA.h - 22) / TRH);
-    const tPages = L.table ? [] : Array.from({ length: Math.ceil(rows.length / perPage) }, (_, i) => rows.slice(i * perPage, (i + 1) * perPage));
-    return { f, fi, ps, F, rows, L, tPages };
+    const ps = parts.filter(p => p.fi === fi), F = drawFrame(ps), rows = partRows(fi), hrows = holeRows(fi), fh = fileHoles(ps), VBp = viewBases(F);
+    const hv = { front: viewHoleCount(fh, VBp.front), top: viewHoleCount(fh, VBp.top), left: viewHoleCount(fh, VBp.left) };
+    const L = planSheet(F, rows.length, hv, hrows.length <= 16 ? hrows.length : 0);
+    const perPage = Math.floor((DA.h - 22) / TRH), chunk = r => Array.from({ length: Math.ceil(r.length / perPage) }, (_, i) => r.slice(i * perPage, (i + 1) * perPage));
+    const tPages = L.table ? [] : chunk(rows), hPages = L.htable || !hrows.length ? [] : chunk(hrows);
+    return { f, fi, ps, F, rows, hrows, fh, hv, L, tPages, hPages };
   });
-  const total = (multi ? 1 : 0) + plans.reduce((s, p) => s + 1 + p.tPages.length, 0);
+  const total = (multi ? 1 : 0) + plans.reduce((s, p) => s + 1 + p.tPages.length + p.hPages.length, 0);
   let page = 0;
   const sheet = (paftaAdi, alt, olcek) => {
     if (page++) doc.addPage('a3', 'landscape');
@@ -1492,7 +1774,7 @@ async function makePdf(onProg = () => {}) {
       const vals = [String(p.fi + 1), p.f.name, String(p.ps.length), fmtDim(p.F.H), fmtDim(p.F.V), fmtDim(p.F.D), fmt(kg, 2), String(pg)];
       cx = DA.x; vals.forEach((v, i) => { const [, cw, al] = cols[i]; pdfText(doc, v, al === 'l' ? cx + 1.5 : al === 'r' ? cx + cw - 1.5 : cx + cw / 2, y + 3.7, { h: 2.1, align: al === 'l' ? 'left' : al === 'r' ? 'right' : 'center', mw: cw - 2.5 }); cx += cw; });
       y += TRH; doc.setLineWidth(0.13); doc.line(DA.x, y, DA.x + w, y);
-      pg += 1 + p.tPages.length;
+      pg += 1 + p.tPages.length + p.hPages.length;
     }
     doc.setLineWidth(0.25); doc.rect(DA.x, DA.y + 12, w, y - DA.y - 12);
     pdfText(doc, 'Boy / yükseklik / derinlik: dosyanın kendi eksenindeki gabari (mm). * Alüminyum (2,70 g/cm³) varsayımıyla.', DA.x, y + 5, { h: 1.9 });
@@ -1521,11 +1803,20 @@ async function makePdf(onProg = () => {}) {
       if (v.dims.includes('vl')) dimV(doc, Y, Y + h, X, X - 6, v1 - v0);
       pdfText(doc, v.ad, X + w / 2, Y + h + 5.2, { h: 2.8, bold: true, align: 'center' });
       pdfText(doc, scaleTxt(v.s), X + w / 2, Y + h + 9.6, { h: 2.4, align: 'center' });
+      if (v.k !== 'iso' && p.hv[v.k]) {   // delikler: merkez işareti + ordinat ölçü + özet
+        const leg = drawHoleDims(doc, vr, VB[v.k], p.fh, X, Y, w, h, v.s, true, v.dims.includes('h') ? DM + 2 : 4);
+        if (leg) pdfText(doc, leg, X + w / 2, Y + h + 13.8, { h: 2.2, align: 'center', mw: Math.max(w + 30, 70) });
+      }
     }
     if (L.table) drawTable(doc, L.table.x, L.table.y, p.rows, `PARÇA LİSTESİ · ${ps.length} gövde`);
+    if (L.htable) drawTable(doc, L.htable.x, L.htable.y, p.hrows, `DELİK LİSTESİ · ${p.hrows.length} delik`, HCOLS, HFOOT);
     p.tPages.forEach((rows, i) => {
       sheet(base, `PARÇA LİSTESİ${p.tPages.length > 1 ? ` (${i + 1}/${p.tPages.length})` : ''}`, '—');
       drawTable(doc, DA.x, DA.y, rows, `${f.name} · PARÇA LİSTESİ · ${ps.length} gövde`);
+    });
+    p.hPages.forEach((rows, i) => {
+      sheet(base, `DELİK LİSTESİ${p.hPages.length > 1 ? ` (${i + 1}/${p.hPages.length})` : ''}`, '—');
+      drawTable(doc, DA.x, DA.y, rows, `${f.name} · DELİK LİSTESİ · ${p.hrows.length} delik`, HCOLS, HFOOT);
     });
   }
   const safe = s => s.replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, ' ').trim().slice(0, 80);
@@ -1564,6 +1855,7 @@ $('#zin').onclick = () => yakinlas(0.7); $('#zout').onclick = () => yakinlas(1 /
 $('#edges').onclick = e => { showEdges = !showEdges; e.target.classList.toggle('on', showEdges); root?.traverse(o => { if (o.userData.edge) o.visible = showEdges; }); };
 $('#xray').onclick = e => { xray = !xray; e.target.classList.toggle('on', xray); applyVis(); };
 $('#dimbtn').onclick = e => { showDims = !showDims; e.target.classList.toggle('on', showDims); drawDims(); };
+$('#holebtn').onclick = e => { showHoles = !showHoles; e.target.classList.toggle('on', showHoles); drawHoles(); };
 $('#zup').onclick = e => { zUp = !zUp; e.target.classList.toggle('on', zUp); lsSetJ('ysv_zup', zUp); if (files.length) { const k = selKey; buildScene(true); if (k) select(k); } };
 const setLayout = l => { layout = l; $('#lay-yan').classList.toggle('on', l === 'yan'); $('#lay-konum').classList.toggle('on', l === 'konum'); if (!root) return; expPos.value = 0; arrange(); afterLayout(); setExplode(0); clearMeasures(); applySection(); fit(curView); };
 $('#lay-yan').onclick = () => setLayout('yan'); $('#lay-konum').onclick = () => setLayout('konum');
@@ -1583,7 +1875,7 @@ document.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   if (k === 'f') fit(); else if (k === '+' || k === '=') yakinlas(0.8); else if (k === '-' || k === '_') yakinlas(1.25);
   else if (k === 'k') setSection(!secOn); else if (k === 'a') $('#expbtn').click(); else if (k === 'm') setMeasure(!measOn);
-  else if (k === 'x') $('#xray').click(); else if (k === 'e') $('#edges').click(); else if (k === 'g') $('#dimbtn').click();
+  else if (k === 'x') $('#xray').click(); else if (k === 'e') $('#edges').click(); else if (k === 'g') $('#dimbtn').click(); else if (k === 'd') $('#holebtn').click();
   else if (k === 'o') $('#projbtn').click(); else if (k === 'n' && files.length > 1) $('#namebtn').click();
   else if (e.key === 'Escape') { if (measOn) setMeasure(false); else if (isoKey) { isoKey = null; applyVis(); if (selKey) select(selKey); } else if (selKey) select(null); }
   else if ('0123458'.includes(e.key)) { const v = { 0: 'iso', 1: 'top', 2: 'bottom', 3: 'front', 4: 'left', 5: 'right', 8: 'back' }[e.key]; fit(v); setViewOn(v); }
@@ -1637,7 +1929,7 @@ const st = readHash();
 if (st && st.L) openLink(st.L, { file: st.file });
 else if (recents().length || !EXAMPLE) startScreen();
 else openLink(EXAMPLE);
-window.__ysv = { get camera() { return camera; }, controls, box, get root() { return root; }, get parts() { return parts; }, get files() { return files; }, S, fit, select, openLink, openFiles, parseLink, makePdf };
+window.__ysv = { get camera() { return camera; }, controls, box, get root() { return root; }, get parts() { return parts; }, get files() { return files; }, S, fit, select, openLink, openFiles, parseLink, makePdf, holesOf };
 </script>
 </body>
 </html>
