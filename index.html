@@ -1950,6 +1950,7 @@ async function openFiles(items, opts = {}) {
   const ok = loaded.filter(Boolean);
   if (!ok.length) { showMsg(esc(errs.length ? errs[0][1] : 'Dosya açılamadı.'), 'card err'); return; }
   files = ok; loadWarn = errs;
+  if (!zUp && files.every(f => extOf(f.name) === '3dm')) { zUp = true; $('#zup').classList.add('on'); }   // Rhino her zaman Z yukarı (kayıtlı tercih değişmez)
   buildScene();
   $('#title').textContent = files.length > 1 ? `${files.length} dosya · ${local ? 'yerel' : crumbName()}` : files[0].name;
   updateLinks();
